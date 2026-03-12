@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a2744">
+<title>Chandrawati Hospital — OPD System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --navy:#1a2744;--navy2:#243159;--teal:#00b8a9;--teal2:#00d4c8;
+  --bg:#eef2fb;--card:#fff;--border:#dde3f0;--text:#1a2744;
+  --muted:#6b7a9d;--danger:#ef4444;--warn:#f59e0b;--success:#10b981;
+  --sidebar-w:230px;--font:'Outfit',sans-serif;
+  --bnh:60px;--safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{font-family:var(--font);background:var(--bg);color:var(--text);height:100%;overflow-x:hidden;}
+.hidden{display:none!important;}
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#c0c7d8;border-radius:10px;}
+
+/* ===== LOGIN ===== */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0d1f3c,#1a2744,#0f3460);padding:16px;}
+.login-card{background:#fff;border-radius:20px;padding:36px 32px;width:400px;max-width:100%;box-shadow:0 30px 80px rgba(0,0,0,.4);}
+.login-logo{text-align:center;margin-bottom:28px;}
+.login-logo .hx{width:64px;height:64px;background:linear-gradient(135deg,#00b8a9,#1a2744);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:26px;color:#fff;margin-bottom:10px;}
+.login-logo h1{font-size:20px;font-weight:700;color:#1a2744;}
+.login-logo p{font-size:12px;color:#6b7a9d;margin-top:3px;}
+.login-tabs{display:flex;background:#eef2fb;border-radius:10px;padding:4px;margin-bottom:22px;}
+.login-tab{flex:1;padding:9px;border:none;background:none;border-radius:8px;font-family:var(--font);font-size:13.5px;font-weight:500;color:#6b7a9d;cursor:pointer;transition:.2s;}
+.login-tab.active{background:#fff;color:#1a2744;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+.lg-field{margin-bottom:16px;}
+.lg-field label{display:block;font-size:12.5px;font-weight:600;color:#1a2744;margin-bottom:5px;}
+.lg-field input{width:100%;padding:11px 14px;border:2px solid #dde3f0;border-radius:10px;font-family:var(--font);font-size:14px;outline:none;transition:.2s;color:#1a2744;}
+.lg-field input:focus{border-color:#00b8a9;}
+.btn-login{width:100%;padding:13px;background:linear-gradient(135deg,#1a2744,#0f3460);color:#fff;border:none;border-radius:10px;font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;transition:.2s;margin-top:6px;}
+.btn-login:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(26,39,68,.4);}
+.login-hint{font-size:11.5px;color:#6b7a9d;text-align:center;margin-top:14px;background:#f8f9fd;padding:9px 12px;border-radius:8px;line-height:1.7;}
+.login-err{color:#ef4444;font-size:13px;text-align:center;margin-top:8px;}
+
+/* ===== MAIN LAYOUT ===== */
+#main-app{display:flex;min-height:100vh;}
+
+/* SIDEBAR - Desktop */
+.sidebar{width:var(--sidebar-w);background:var(--navy);color:#fff;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;transition:transform .3s cubic-bezier(.4,0,.2,1);}
+.sidebar-logo{padding:18px 16px 12px;border-bottom:1px solid rgba(255,255,255,.1);}
+.sidebar-logo .hl{font-size:18px;font-weight:800;color:var(--teal);}
+.sidebar-logo .hs{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;}
+.sidebar-user{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:9px;}
+.u-av{width:32px;height:32px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;}
+.u-nm{font-size:13px;font-weight:600;}
+.u-rl{font-size:11px;color:rgba(255,255,255,.5);}
+.sidebar-nav{flex:1;padding:10px 8px;overflow-y:auto;}
+.nav-sec{font-size:9.5px;font-weight:700;color:rgba(255,255,255,.3);letter-spacing:1.5px;text-transform:uppercase;padding:12px 8px 5px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;cursor:pointer;transition:.15s;font-size:13px;font-weight:500;color:rgba(255,255,255,.7);margin-bottom:1px;}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff;}
+.nav-item.active{background:var(--teal);color:#fff;font-weight:600;}
+.nav-icon{font-size:15px;width:18px;text-align:center;}
+.sidebar-foot{padding:12px 16px;border-top:1px solid rgba(255,255,255,.1);}
+.btn-logout{width:100%;padding:8px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#fca5a5;font-family:var(--font);font-size:12.5px;cursor:pointer;transition:.2s;}
+.btn-logout:hover{background:rgba(239,68,68,.25);}
+
+/* SIDEBAR OVERLAY (mobile) */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;backdrop-filter:blur(2px);}
+.sidebar-overlay.show{display:block;}
+
+/* MAIN CONTENT */
+.main-content{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{background:#fff;padding:13px 24px;display:flex;align-items:center;gap:12px;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:100;}
+.topbar-menu{display:none;width:36px;height:36px;border:none;background:var(--bg);border-radius:8px;cursor:pointer;font-size:18px;flex-shrink:0;}
+.topbar-title{font-size:17px;font-weight:700;color:var(--navy);flex:1;}
+.topbar-date{font-size:12px;color:var(--muted);white-space:nowrap;}
+.content-area{flex:1;padding:20px 24px;overflow-y:auto;padding-bottom:calc(var(--bnh) + var(--safe-b) + 20px);}
+
+/* BOTTOM NAV (mobile only) */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:var(--bnh);background:#fff;border-top:2px solid var(--border);z-index:150;padding-bottom:var(--safe-b);display:none;grid-template-columns:repeat(5,1fr);}
+.bn-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;border:none;background:none;color:var(--muted);transition:.15s;font-family:var(--font);padding:8px 4px;}
+.bn-item.active{color:var(--teal);}
+.bn-item .bn-icon{font-size:20px;}
+.bn-item .bn-lbl{font-size:10px;font-weight:600;}
+
+/* ===== CARDS ===== */
+.card{background:#fff;border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:18px;}
+.card-hd{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.card-title{font-size:14.5px;font-weight:700;color:var(--navy);}
+.card-body{padding:18px;}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+.stat-card{background:#fff;border-radius:13px;border:1px solid var(--border);padding:16px 18px;}
+.stat-num{font-size:26px;font-weight:800;color:var(--navy);}
+.stat-lbl{font-size:11.5px;color:var(--muted);margin-top:3px;font-weight:500;}
+.stat-icon{font-size:20px;margin-bottom:6px;}
+
+/* ===== BUTTONS ===== */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border:none;border-radius:9px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:.2s;text-decoration:none;white-space:nowrap;}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-primary:hover{background:var(--navy2);}
+.btn-teal{background:var(--teal);color:#fff;}
+.btn-teal:hover{background:var(--teal2);}
+.btn-outline{background:transparent;border:2px solid var(--border);color:var(--navy);}
+.btn-outline:hover{border-color:var(--teal);color:var(--teal);}
+.btn-sm{padding:6px 12px;font-size:12px;}
+.btn-xs{padding:4px 8px;font-size:11.5px;border-radius:6px;}
+.btn-danger{background:var(--danger);color:#fff;}
+
+/* ===== FORMS ===== */
+.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.fg2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
+.sp2{grid-column:span 2;}.sp3{grid-column:span 3;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:12px;font-weight:600;color:var(--navy);}
+.field label.req::after{content:" *";color:var(--danger);}
+.fld{padding:9px 12px;border:2px solid var(--border);border-radius:9px;font-family:var(--font);font-size:13.5px;color:var(--text);outline:none;transition:.2s;width:100%;}
+.fld:focus{border-color:var(--teal);}
+textarea.fld{resize:vertical;min-height:65px;}
+.hint{font-size:11px;color:var(--muted);}
+
+/* ===== PATIENT TABLE ===== */
+.sbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.sbar input,.sbar select{padding:9px 14px;border:2px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13.5px;outline:none;transition:.2s;}
+.sbar input:focus{border-color:var(--teal);}
+.sbar input{flex:1;min-width:180px;}
+.pt-table{width:100%;border-collapse:collapse;}
+.pt-table th{padding:9px 12px;text-align:left;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;background:#f8f9fd;border-bottom:2px solid var(--border);}
+.pt-table td{padding:11px 12px;border-bottom:1px solid var(--border);font-size:13px;}
+.pt-table tr:hover td{background:#f8f9fd;}
+.uhid{font-size:11px;font-weight:700;background:#eef2fb;color:var(--navy);padding:2px 7px;border-radius:5px;white-space:nowrap;}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.dp{background:#dbeafe;color:#1d4ed8;}
+.do{background:#fce7f3;color:#9d174d;}
+.dg{background:#d1fae5;color:#065f46;}
+.dr{background:#fef3c7;color:#92400e;}
+.sw{background:#fef3c7;color:#92400e;}
+.si{background:#dbeafe;color:#1d4ed8;}
+.sd{background:#d1fae5;color:#065f46;}
+
+/* ===== ANTHROPOMETRY ===== */
+.vg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.anthro-box{background:linear-gradient(135deg,#1a2744,#243159);color:#fff;border-radius:13px;padding:18px;margin-bottom:16px;}
+.ar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}
+.ai{background:rgba(255,255,255,.1);border-radius:9px;padding:10px;text-align:center;}
+.av{font-size:18px;font-weight:700;}
+.al{font-size:10.5px;opacity:.7;margin-top:2px;}
+.zn{color:#6ee7b7;}.zw{color:#fde68a;}.zd{color:#fca5a5;}
+.muac-g{background:#d1fae5;color:#065f46;padding:3px 8px;border-radius:5px;font-weight:700;font-size:11.5px;}
+.muac-y{background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:5px;font-weight:700;font-size:11.5px;}
+.muac-r{background:#fee2e2;color:#991b1b;padding:3px 8px;border-radius:5px;font-weight:700;font-size:11.5px;}
+
+/* ===== PRESCRIPTION ===== */
+.rx-drug-row{background:#f8f9fd;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;position:relative;}
+.rx-drug-grid{display:grid;grid-template-columns:2.5fr 1.2fr 1fr 1fr 1.2fr;gap:8px;align-items:start;}
+.rx-drug-grid .fld{padding:7px 9px;font-size:12.5px;}
+.rx-remove{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:5px;background:#fee2e2;color:#ef4444;border:none;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;}
+.rx-add-btn{width:100%;padding:10px;border:2px dashed var(--teal);background:transparent;border-radius:10px;color:var(--teal);font-family:var(--font);font-size:13.5px;font-weight:600;cursor:pointer;transition:.2s;margin-top:4px;}
+.rx-add-btn:hover{background:#f0fdfa;}
+.dose-hint{font-size:11px;padding:5px 8px;background:linear-gradient(135deg,#f0fdfa,#f0fdf4);border:1px solid #a7f3d0;border-radius:6px;color:#047857;margin-top:4px;line-height:1.5;}
+
+/* ===== DRUG SEARCH DROPDOWN ===== */
+.drug-search-wrap{position:relative;}
+.drug-dd{position:absolute;top:100%;left:0;right:0;background:#fff;border:2px solid var(--teal);border-top:none;border-radius:0 0 10px 10px;max-height:220px;overflow-y:auto;z-index:300;box-shadow:0 8px 24px rgba(0,0,0,.15);}
+.drug-opt{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:.15s;}
+.drug-opt:hover{background:#f0fdf4;}
+.drug-opt-nm{font-size:13px;font-weight:600;color:var(--navy);}
+.drug-opt-ct{font-size:11px;color:var(--muted);}
+.drug-opt-ds{font-size:11.5px;color:var(--teal);margin-top:1px;}
+
+/* ===== INVESTIGATIONS ===== */
+.inv-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+.inv-item{display:flex;align-items:center;gap:7px;padding:8px 10px;border:2px solid var(--border);border-radius:9px;cursor:pointer;transition:.2s;font-size:12.5px;font-weight:500;}
+.inv-item:hover{border-color:var(--teal);}
+.inv-item.sel{border-color:var(--teal);background:#f0fdfa;color:var(--teal);}
+.inv-item input[type=checkbox]{accent-color:var(--teal);}
+.inv-custom{margin-top:10px;}
+
+/* ===== VITALS ===== */
+.v-box{background:var(--bg);border:2px solid var(--border);border-radius:11px;padding:12px;text-align:center;}
+.v-val{font-size:20px;font-weight:700;color:var(--navy);}
+.v-lbl{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* ===== VISIT HISTORY ===== */
+.visit-card{border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:10px;cursor:pointer;transition:.2s;}
+.visit-card:hover{border-color:var(--teal);box-shadow:0 4px 12px rgba(0,184,169,.1);}
+
+/* ===== TAB BAR ===== */
+.tab-bar{display:flex;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.tab-btn{padding:9px 16px;border:none;background:none;font-family:var(--font);font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:.15s;}
+.tab-btn.active{color:var(--teal);border-bottom-color:var(--teal);font-weight:700;}
+
+/* ===== ALERTS ===== */
+.alert{padding:11px 14px;border-radius:9px;font-size:13px;margin-bottom:12px;}
+.alert-info{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;}
+.alert-success{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;}
+.alert-warn{background:#fef3c7;color:#92400e;border:1px solid #fde68a;}
+.alert-danger{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;}
+
+/* ===== EMPTY STATE ===== */
+.empty{text-align:center;padding:50px 20px;color:var(--muted);}
+.empty-icon{font-size:44px;margin-bottom:10px;opacity:.4;}
+
+/* ===== TOAST ===== */
+#toast{position:fixed;bottom:calc(var(--bnh) + var(--safe-b) + 16px);right:16px;background:#1a2744;color:#fff;padding:12px 18px;border-radius:11px;font-size:13.5px;font-weight:500;z-index:999;display:none;box-shadow:0 8px 24px rgba(0,0,0,.3);border-left:4px solid var(--teal);max-width:280px;}
+
+/* ===== MODAL ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,20,40,.55);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);padding:12px;}
+.modal-box{background:#fff;border-radius:16px;width:680px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,.3);}
+.modal-hd{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:10;}
+.modal-hd h3{font-size:15px;font-weight:700;}
+.modal-cls{width:26px;height:26px;border-radius:7px;background:#f3f4f6;border:none;cursor:pointer;font-size:15px;}
+.modal-body{padding:20px;}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);}
+  .main-content{margin-left:0;}
+  .topbar-menu{display:flex;align-items:center;justify-content:center;}
+  .bottom-nav{display:grid;}
+  .content-area{padding:14px 14px;padding-bottom:calc(var(--bnh) + var(--safe-b) + 16px);}
+  .topbar{padding:10px 14px;}
+  .stats-row{grid-template-columns:repeat(2,1fr);gap:10px;}
+  .fg{grid-template-columns:repeat(2,1fr);}
+  .fg .sp3{grid-column:span 2;}
+  .vg{grid-template-columns:repeat(2,1fr);}
+  .ar{grid-template-columns:repeat(2,1fr);}
+  .rx-drug-grid{grid-template-columns:1fr 1fr;gap:6px;}
+  .inv-grid{grid-template-columns:repeat(2,1fr);}
+  #toast{bottom:calc(var(--bnh) + var(--safe-b) + 10px);right:10px;left:10px;}
+  .modal-box{max-height:95vh;}
+  .pt-table th:nth-child(5),.pt-table td:nth-child(5),
+  .pt-table th:nth-child(6),.pt-table td:nth-child(6){display:none;}
+}
+@media(max-width:480px){
+  .fg{grid-template-columns:1fr;}
+  .fg .sp2,.fg .sp3{grid-column:span 1;}
+  .fg2{grid-template-columns:1fr;}
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+  .rx-drug-grid{grid-template-columns:1fr;}
+  .inv-grid{grid-template-columns:repeat(2,1fr);}
+  .login-card{padding:24px 18px;}
+}
+
+/* ===== PRINT ===== */
+@media print{
+  body *{visibility:hidden;}
+  #print-area,#print-area *{visibility:visible;}
+  #print-area{position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;}
+}
+.print-sheet{font-family:'Lora',serif;background:#fff;max-width:210mm;margin:0 auto;padding:20mm 18mm 16mm;}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px double #1a2744;padding-bottom:12px;margin-bottom:14px;}
+.phn{font-size:21px;font-weight:700;color:#1a2744;font-family:'Outfit',sans-serif;}
+.phs{font-size:11px;color:#6b7a9d;margin-top:3px;font-family:'Outfit',sans-serif;}
+.pc{font-size:11px;color:#6b7a9d;text-align:right;font-family:'Outfit',sans-serif;}
+.ppts{background:#f8f9fd;border-radius:9px;padding:10px 14px;margin-bottom:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.ppt-i{font-size:11.5px;font-family:'Outfit',sans-serif;}
+.ppt-i span{font-weight:700;display:block;font-size:13.5px;color:#1a2744;}
+.pvits{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:12px;}
+.pvit{background:#f8f9fd;border-radius:7px;padding:6px 9px;font-size:11px;color:#6b7a9d;font-family:'Outfit',sans-serif;}
+.pvit span{display:block;font-weight:700;font-size:13px;color:#1a2744;}
+.pdb{border:1.5px solid #dde3f0;border-radius:8px;padding:9px 13px;margin-bottom:12px;}
+.pdbt{font-size:10px;font-weight:700;color:#6b7a9d;text-transform:uppercase;letter-spacing:.5px;font-family:'Outfit',sans-serif;margin-bottom:4px;}
+.prx{font-size:26px;color:#1a2744;font-weight:400;margin-bottom:9px;}
+.prxt{width:100%;border-collapse:collapse;margin-bottom:14px;}
+.prxt th{font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7a9d;padding:6px 9px;background:#f8f9fd;border-bottom:2px solid #dde3f0;font-family:'Outfit',sans-serif;}
+.prxt td{padding:8px 9px;border-bottom:1px solid #f0f4f8;font-size:13px;vertical-align:top;}
+.pinvt{width:100%;border-collapse:collapse;margin-bottom:14px;}
+.pinvt th{font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7a9d;padding:6px 9px;background:#fff3f9;border-bottom:2px solid #fde8f3;font-family:'Outfit',sans-serif;}
+.pinvt td{padding:7px 9px;border-bottom:1px solid #fce7f3;font-size:13px;}
+.pft{margin-top:16px;padding-top:10px;border-top:1px solid #dde3f0;display:flex;justify-content:space-between;align-items:flex-end;}
+.psig{text-align:right;font-family:'Outfit',sans-serif;}
+.psig-nm{font-size:15px;font-weight:700;color:#1a2744;}
+.psig-ql{font-size:10.5px;color:#6b7a9d;margin-top:1px;}
+.pantro{background:#f0fdf4;border:1px solid #a7f3d0;border-radius:7px;padding:7px 12px;margin-bottom:12px;display:flex;gap:16px;font-size:11.5px;font-family:'Outfit',sans-serif;}
+.pantro span{font-weight:700;color:#065f46;}
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+<div id="print-area" style="display:none;"></div>
+<div id="modal-container"></div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+<div class="login-card">
+  <div class="login-logo">
+    <div class="hx">✚</div>
+    <h1>Chandrawati Hospital</h1>
+    <p>GT Road, Barwadda, Dhanbad · OPD System v2</p>
+  </div>
+  <div class="login-tabs">
+    <button class="login-tab active" onclick="setRole('doctor')">🩺 Doctor</button>
+    <button class="login-tab" onclick="setRole('nurse')">👩‍⚕️ Nursing Staff</button>
+  </div>
+  <div class="lg-field"><label>Username</label><input id="lu" type="text" placeholder="Username" onkeydown="if(event.key==='Enter')document.getElementById('lp').focus()"></div>
+  <div class="lg-field"><label>Password</label><input id="lp" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+  <button class="btn-login" onclick="doLogin()">Sign In →</button>
+  <div id="lerr" class="login-err"></div>
+  <div class="login-hint">
+    <b>Doctor:</b> doc_ritik / dr1234 &nbsp;|&nbsp; doc_obg / obg1234<br>
+    doc_gm / gm1234 &nbsp;|&nbsp; doc_ortho / ortho1234<br>
+    <b>Nurse:</b> nurse1 / nurse1234
+  </div>
+</div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app" class="hidden">
+  <div class="sidebar-overlay" id="sov" onclick="closeSidebar()"></div>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-logo"><div class="hl">✚ Chandrawati</div><div class="hs">Hospital OPD System</div></div>
+    <div class="sidebar-user"><div class="u-av" id="uav">DR</div><div><div class="u-nm" id="unm">Dr. Ritik</div><div class="u-rl" id="url">Pediatrics</div></div></div>
+    <nav class="sidebar-nav" id="snav"></nav>
+    <div class="sidebar-foot"><button class="btn-logout" onclick="doLogout()">⏻ Sign Out</button></div>
+  </div>
+  <div class="main-content">
+    <div class="topbar">
+      <button class="topbar-menu" onclick="openSidebar()">☰</button>
+      <div class="topbar-title" id="ttitle">Dashboard</div>
+      <div class="topbar-date" id="tdate"></div>
+    </div>
+    <div class="content-area" id="carea"></div>
+  </div>
+  <nav class="bottom-nav" id="bnav"></nav>
+</div>
+
+<script>
+// ========================================================
+// DRUG DATABASE (Meherban Singh) — with formulation details
+// ========================================================
+const DRUGS=[
+/* ---- ANTIBIOTICS ---- */
+{name:'Amoxicillin',cat:'Antibiotic',dose_mgkg:40,max_mg:3000,freq:['BD','TDS'],forms:{drops:'Drops 100mg/ml',syrup:'125mg/5ml or 250mg/5ml Syrup',tab:'250mg/500mg Cap/Tab'},note:'Higher dose 80-90 mg/kg/day for AOM/resistant organisms. Take with or without food.'},
+{name:'Amoxicillin-Clavulanate',cat:'Antibiotic',dose_mgkg:40,max_mg:3000,freq:['BD','TDS'],forms:{drops:'Drops 125/31.25mg/5ml',syrup:'200/28.5mg/5ml or 400/57mg/5ml Syrup',tab:'625mg Tab'},note:'Use BD formulation to reduce diarrhea. Amox component dosed at 40-90 mg/kg/day.'},
+{name:'Azithromycin',cat:'Antibiotic',dose_mgkg:10,max_mg:500,freq:['OD'],forms:{drops:'100mg/5ml Suspension',syrup:'200mg/5ml Suspension',tab:'250mg/500mg Tab'},note:'OD dosing x 3 days (CAP) or x 5 days (pharyngitis). Empty stomach preferred.'},
+{name:'Cefixime',cat:'Antibiotic (3G Ceph)',dose_mgkg:8,max_mg:400,freq:['OD','BD'],forms:{drops:'50mg/5ml Suspension',syrup:'100mg/5ml Suspension',tab:'200mg/400mg Tab'},note:'Enteric fever, UTI, respiratory infections. BD dosing preferred in severe infections.'},
+{name:'Cefuroxime',cat:'Antibiotic (2G Ceph)',dose_mgkg:25,max_mg:500,freq:['BD'],forms:{drops:'125mg/5ml Suspension',syrup:'125mg/5ml Suspension',tab:'250mg/500mg Tab'},note:'Mild-moderate respiratory, AOM, UTI. Take with food for better absorption.'},
+{name:'Cephalexin',cat:'Antibiotic (1G Ceph)',dose_mgkg:40,max_mg:4000,freq:['QID'],forms:{drops:'125mg/5ml Drops',syrup:'125mg/5ml Syrup',tab:'250mg/500mg Cap'},note:'Skin, soft tissue, mild respiratory. Not effective against H.influenzae.'},
+{name:'Cloxacillin',cat:'Antibiotic (Anti-staph)',dose_mgkg:75,max_mg:6000,freq:['QID'],forms:{syrup:'125mg/5ml Syrup',tab:'250mg/500mg Cap'},note:'MSSA. Take on empty stomach. Use IV for severe infections.'},
+{name:'Co-trimoxazole',cat:'Antibiotic',dose_mgkg:8,max_mg:320,freq:['BD'],forms:{drops:'40/200mg/5ml Suspension',syrup:'40/200mg/5ml Suspension',tab:'80/400mg Tab (SS); 160/800mg Tab (DS)'},note:'TMP component dosed. PCP prophylaxis, UTI, enteric fever. Avoid in G6PD deficiency.'},
+{name:'Erythromycin',cat:'Antibiotic (Macrolide)',dose_mgkg:40,max_mg:2000,freq:['QID'],forms:{drops:'125mg/5ml Drops',syrup:'125mg/5ml or 250mg/5ml Syrup',tab:'250mg/500mg Tab'},note:'Pertussis, chlamydia, diphtheria. GI side effects common. Take with food.'},
+{name:'Metronidazole',cat:'Antibiotic/Antiprotozoal',dose_mgkg:35,max_mg:2250,freq:['TDS'],forms:{drops:'200mg/5ml Suspension',syrup:'200mg/5ml Suspension',tab:'200mg/400mg Tab'},note:'Giardia: 15 mg/kg/day x 5 days. Amebiasis: 35-50 mg/kg/day x 7-10 days. Take with food.'},
+{name:'Rifampicin',cat:'Antitubercular',dose_mgkg:15,max_mg:600,freq:['OD'],forms:{syrup:'100mg/5ml Syrup',tab:'150mg/300mg/450mg Cap'},note:'Take 30 min before meals. Orange discoloration of urine/secretions. Multiple drug interactions.'},
+{name:'Isoniazid',cat:'Antitubercular',dose_mgkg:10,max_mg:300,freq:['OD'],forms:{syrup:'100mg/5ml Syrup',tab:'100mg/300mg Tab'},note:'Add pyridoxine B6. Hepatotoxic. Give on empty stomach.'},
+{name:'Pyrazinamide',cat:'Antitubercular',dose_mgkg:35,max_mg:2000,freq:['OD'],forms:{syrup:'250mg/5ml Suspension',tab:'500mg Tab'},note:'Initial 2 months of TB. Hepatotoxic, hyperuricemia.'},
+{name:'Ethambutol',cat:'Antitubercular',dose_mgkg:20,max_mg:2500,freq:['OD'],forms:{tab:'400mg/800mg Tab'},note:'Optic neuritis risk — avoid in <5 yr if unable to report visual changes.'},
+{name:'Fluconazole',cat:'Antifungal',dose_mgkg:6,max_mg:400,freq:['OD'],forms:{syrup:'10mg/ml Suspension',tab:'50mg/150mg/200mg Cap'},note:'Candidiasis: 3-6 mg/kg/day. Loading dose 2x maintenance on day 1.'},
+{name:'Clotrimazole',cat:'Antifungal (Topical)',dose_mgkg:0,max_mg:0,freq:['BD','TDS'],forms:{drops:'Solution ear drops',syrup:'N/A — topical only',tab:'1% Cream / Dusting Powder'},note:'Topical use only. Apply thin layer. Continue 2 weeks after clearance.'},
+{name:'Albendazole',cat:'Antiparasitic',dose_mgkg:0,max_mg:400,freq:['Single dose'],forms:{drops:'200mg/5ml Suspension',syrup:'200mg/5ml Suspension',tab:'400mg Tab'},note:'>2yr: 400mg single dose. 1-2yr: 200mg. Take with fatty meal. Repeat after 2 weeks.'},
+{name:'Ivermectin',cat:'Antiparasitic',dose_mgkg:0.2,max_mg:12,freq:['Single dose'],forms:{tab:'3mg/6mg Tab'},note:'>15kg. Scabies: single dose repeat after 2 weeks. Empty stomach.'},
+/* ---- ANTIPYRETICS ---- */
+{name:'Paracetamol',cat:'Antipyretic/Analgesic',dose_mgkg:15,max_mg:1000,freq:['Q4-6h'],forms:{drops:'100mg/ml Drops (0.5ml/kg)',syrup:'125mg/5ml or 250mg/5ml Syrup',tab:'500mg Tab'},note:'Max 5 doses/24h. Safest antipyretic. Avoid in severe hepatic disease.'},
+{name:'Ibuprofen',cat:'NSAID/Antipyretic',dose_mgkg:10,max_mg:600,freq:['Q6-8h'],forms:{drops:'100mg/5ml Drops',syrup:'100mg/5ml or 200mg/5ml Syrup',tab:'200mg/400mg Tab'},note:'>3 months, >5kg. Avoid in dengue, dehydration, aspirin-sensitive asthma. Take with food.'},
+{name:'Naproxen',cat:'NSAID',dose_mgkg:7.5,max_mg:500,freq:['BD'],forms:{syrup:'125mg/5ml Suspension',tab:'250mg/500mg Tab'},note:'JIA, musculoskeletal. Take with food.'},
+/* ---- ANTIHISTAMINES ---- */
+{name:'Cetirizine',cat:'Antihistamine (2G)',dose_mgkg:0.25,max_mg:10,freq:['OD','BD'],forms:{drops:'5mg/5ml Drops',syrup:'5mg/5ml Syrup',tab:'10mg Tab'},note:'>6 months. OD dosing >2 yr. Minimal sedation.'},
+{name:'Levocetirizine',cat:'Antihistamine (2G)',dose_mgkg:0.125,max_mg:5,freq:['OD'],forms:{drops:'2.5mg/5ml Drops',syrup:'2.5mg/5ml Syrup',tab:'5mg Tab'},note:'>6 months. Twice potency of cetirizine at half the dose.'},
+{name:'Loratadine',cat:'Antihistamine (2G)',dose_mgkg:0,max_mg:10,freq:['OD'],forms:{syrup:'5mg/5ml Syrup',tab:'10mg Tab'},note:'>2yr: 5mg OD (<30kg); 10mg OD (>30kg). Non-sedating.'},
+{name:'Fexofenadine',cat:'Antihistamine (2G)',dose_mgkg:0,max_mg:180,freq:['OD','BD'],forms:{syrup:'30mg/5ml Suspension',tab:'120mg/180mg Tab'},note:'>6yr: 30mg BD. Non-sedating. Avoid fruit juice.'},
+{name:'Chlorpheniramine',cat:'Antihistamine (1G)',dose_mgkg:0.35,max_mg:12,freq:['TDS'],forms:{drops:'1mg/5ml Drops',syrup:'2mg/5ml Syrup',tab:'4mg Tab'},note:'Sedating. Avoid in infants (paradoxical excitation).'},
+{name:'Hydroxyzine',cat:'Antihistamine (1G)',dose_mgkg:1,max_mg:50,freq:['TDS'],forms:{syrup:'10mg/5ml Syrup',tab:'10mg/25mg Tab'},note:'Urticaria, pruritus, pre-procedure anxiety. Sedating.'},
+/* ---- RESPIRATORY ---- */
+{name:'Salbutamol',cat:'Bronchodilator (SABA)',dose_mgkg:0.1,max_mg:4,freq:['TDS','Q4-6h'],forms:{drops:'2mg/5ml Syrup (oral)',syrup:'2mg/5ml Syrup',tab:'2mg/4mg Tab'},note:'Nebulized: 2.5mg (<5yr) or 5mg (>5yr). Q20min x3 in acute severe asthma.'},
+{name:'Montelukast',cat:'Leukotriene RA',dose_mgkg:0,max_mg:10,freq:['OD (PM)'],forms:{drops:'4mg Granules',syrup:'4mg Granules (mix in water/food)',tab:'5mg Chewable/10mg Tab'},note:'<2yr: 4mg granules; 2-5yr: 4mg; 6-14yr: 5mg; >14yr: 10mg. Take at bedtime.'},
+{name:'Prednisolone',cat:'Systemic Corticosteroid',dose_mgkg:1,max_mg:60,freq:['OD','BD'],forms:{drops:'5mg/5ml Syrup',syrup:'5mg/5ml Syrup',tab:'5mg/10mg/20mg Tab'},note:'Asthma: 1-2 mg/kg/day x 3-5 days. Morning dosing preferred.'},
+{name:'Dexamethasone',cat:'Systemic Corticosteroid',dose_mgkg:0.6,max_mg:10,freq:['OD'],forms:{syrup:'0.5mg/5ml Syrup',tab:'0.5mg/4mg Tab'},note:'Croup: 0.6 mg/kg single oral dose. Antiemetic: 0.1 mg/kg.'},
+{name:'Ambroxol',cat:'Mucolytic',dose_mgkg:1.4,max_mg:90,freq:['BD','TDS'],forms:{drops:'7.5mg/ml Drops',syrup:'15mg/5ml Syrup',tab:'30mg Tab'},note:'Mucolytic. Take after meals.'},
+/* ---- GI ---- */
+{name:'Domperidone',cat:'Antiemetic/Prokinetic',dose_mgkg:0.3,max_mg:10,freq:['TDS'],forms:{drops:'1mg/ml Drops',syrup:'5mg/5ml Suspension',tab:'10mg Tab'},note:'Give 15-30 min before meals. QT risk at high doses — use lowest dose.'},
+{name:'Ondansetron',cat:'Antiemetic (5HT3)',dose_mgkg:0.15,max_mg:8,freq:['Q8h'],forms:{drops:'4mg/5ml Syrup',syrup:'4mg/5ml Syrup',tab:'4mg/8mg Tab ODT'},note:'Single dose often sufficient for gastroenteritis. QT risk at high doses.'},
+{name:'Omeprazole',cat:'PPI',dose_mgkg:1,max_mg:40,freq:['OD'],forms:{syrup:'10mg/5ml Suspension',tab:'10mg/20mg/40mg Tab'},note:'GERD, PUD. Give 30-60 min before breakfast.'},
+{name:'Pantoprazole',cat:'PPI',dose_mgkg:1,max_mg:40,freq:['OD','BD'],forms:{syrup:'20mg/5ml Suspension',tab:'20mg/40mg Tab'},note:'GERD, PUD, stress ulcer prophylaxis.'},
+{name:'Lactulose',cat:'Osmotic Laxative',dose_mgkg:2,max_mg:60,freq:['BD'],forms:{drops:'3.35g/5ml Solution',syrup:'3.35g/5ml Solution',tab:'10g Sachets'},note:'1-3 ml/kg/day in divided doses. Titrate to 2-3 soft stools/day.'},
+{name:'Zinc Sulfate',cat:'GI/Nutritional',dose_mgkg:0,max_mg:20,freq:['OD'],forms:{drops:'10mg/5ml Drops',syrup:'10mg/5ml Suspension',tab:'20mg Dispersible Tab'},note:'<6mo: 10mg/day; >6mo: 20mg/day x 14 days with ORS for acute diarrhea.'},
+/* ---- NUTRITIONAL ---- */
+{name:'Ferrous Sulfate',cat:'Nutritional (Iron)',dose_mgkg:3,max_mg:150,freq:['BD','TDS'],forms:{drops:'15mg/ml Drops (elemental)',syrup:'25mg/5ml Syrup (elemental)',tab:'150mg Tab (45mg elemental)'},note:'3-6 mg/kg/day elemental iron. Give empty stomach or with Vit C. Black stools normal.'},
+{name:'Iron Polymaltose',cat:'Nutritional (Iron)',dose_mgkg:5,max_mg:200,freq:['OD'],forms:{drops:'50mg/ml Drops',syrup:'50mg/5ml Syrup',tab:'100mg Tab'},note:'Better tolerated than ferrous sulfate. Can give with food. No black stools.'},
+{name:'Folic Acid',cat:'Nutritional',dose_mgkg:0,max_mg:5,freq:['OD'],forms:{drops:'0.1mg/ml Drops',syrup:'1mg/5ml Syrup',tab:'5mg Tab'},note:'Treatment: 1-5mg/day. Prevention: 0.1-0.4mg/day.'},
+{name:'Vitamin D3',cat:'Nutritional',dose_mgkg:0,max_mg:4000,freq:['OD'],forms:{drops:'400 IU/drop or 1000 IU/ml',syrup:'400 IU/ml Solution',tab:'60000 IU Sachet (monthly)'},note:'Prophylaxis: 400-1000 IU/day. Deficiency: 1000-5000 IU/day. Rickets: 60000 IU weekly x 6 weeks.'},
+{name:'Vitamin B12',cat:'Nutritional',dose_mgkg:0,max_mg:1000,freq:['OD'],forms:{drops:'250mcg/5ml Drops',syrup:'250mcg/5ml Syrup',tab:'500mcg/1000mcg Tab'},note:'B12 deficiency anemia, neurological. IM for malabsorption.'},
+{name:'Multivitamin',cat:'Nutritional',dose_mgkg:0,max_mg:0,freq:['OD'],forms:{drops:'Drops (0-12 months)',syrup:'Syrup (1-12 years)',tab:'Tablets (>12 years)'},note:'Age-appropriate formulation. Include iron only when indicated.'},
+/* ---- ANTIEPILEPTICS ---- */
+{name:'Phenobarbitone',cat:'Antiepileptic',dose_mgkg:4,max_mg:200,freq:['OD','BD'],forms:{drops:'15mg/5ml Syrup',syrup:'15mg/5ml Syrup',tab:'30mg/60mg Tab'},note:'Maintenance 3-5 mg/kg/day. Loading 15-20 mg/kg IV for status. TDM: 15-40 mcg/ml.'},
+{name:'Sodium Valproate',cat:'Antiepileptic',dose_mgkg:20,max_mg:1500,freq:['BD','TDS'],forms:{syrup:'200mg/5ml Syrup',tab:'200mg EC/500mg EC Tab'},note:'Broad spectrum. AVOID mitochondrial disease, liver disease, <2yr if possible. Teratogenic.'},
+{name:'Levetiracetam',cat:'Antiepileptic',dose_mgkg:20,max_mg:3000,freq:['BD'],forms:{syrup:'100mg/ml Solution',tab:'250mg/500mg Tab'},note:'Broad spectrum. No drug interactions. Behavioral side effects.'},
+{name:'Carbamazepine',cat:'Antiepileptic',dose_mgkg:10,max_mg:1200,freq:['BD'],forms:{syrup:'100mg/5ml Suspension',tab:'100mg/200mg Tab/400mg CR'},note:'Focal seizures, GTC. Hyponatremia. HLA-B*1502 screening in Asian patients.'},
+{name:'Oxcarbazepine',cat:'Antiepileptic',dose_mgkg:10,max_mg:2400,freq:['BD'],forms:{syrup:'300mg/5ml Suspension',tab:'150mg/300mg/600mg Tab'},note:'Focal seizures. Hyponatremia risk. Fewer drug interactions than carbamazepine.'},
+{name:'Clonazepam',cat:'Antiepileptic/BZD',dose_mgkg:0.05,max_mg:20,freq:['BD','TDS'],forms:{syrup:'0.5mg/5ml Liquid',tab:'0.5mg/2mg Tab'},note:'Absence, myoclonic. Tolerance develops. Sedation. Available in liquid for infants.'},
+/* ---- CARDIAC ---- */
+{name:'Furosemide',cat:'Loop Diuretic',dose_mgkg:1,max_mg:80,freq:['OD','BD'],forms:{drops:'10mg/ml Solution',syrup:'10mg/ml Solution',tab:'40mg Tab'},note:'Heart failure, edema. Monitor electrolytes (hypokalemia). 1-2 mg/kg/dose.'},
+{name:'Spironolactone',cat:'K-sparing Diuretic',dose_mgkg:2,max_mg:200,freq:['OD','BD'],forms:{syrup:'25mg/5ml Suspension',tab:'25mg/50mg/100mg Tab'},note:'CHF, nephrotic syndrome. Hyperkalemia. Avoid with ACEi/ARBs.'},
+{name:'Atenolol',cat:'Beta Blocker',dose_mgkg:1.5,max_mg:100,freq:['OD'],forms:{tab:'25mg/50mg Tab'},note:'Hypertension, tachyarrhythmias. Avoid in asthma, heart block. Cardioselective.'},
+{name:'Amlodipine',cat:'Calcium Channel Blocker',dose_mgkg:0.15,max_mg:10,freq:['OD'],forms:{syrup:'1mg/ml Oral Solution',tab:'2.5mg/5mg/10mg Tab'},note:'Hypertension. Long half-life, OD dosing.'},
+{name:'Captopril',cat:'ACE Inhibitor',dose_mgkg:0.3,max_mg:150,freq:['TDS'],forms:{syrup:'1mg/ml Solution',tab:'25mg/50mg Tab'},note:'CHF, hypertension, proteinuria. Cough, hyperkalemia. Monitor renal function.'},
+/* ---- ANTIMALARIALS ---- */
+{name:'Chloroquine',cat:'Antimalarial',dose_mgkg:10,max_mg:300,freq:['OD x 3 days'],forms:{syrup:'50mg/5ml Syrup',tab:'250mg Tab (150mg base)'},note:'P.vivax, P.malariae. Day 1: 10 mg base/kg, Day 2: 10 mg/kg, Day 3: 5 mg/kg. Take after meals.'},
+{name:'Primaquine',cat:'Antimalarial (Radical cure)',dose_mgkg:0.25,max_mg:15,freq:['OD x 14 days'],forms:{tab:'7.5mg/15mg Tab'},note:'EXCLUDE G6PD deficiency before use. P.vivax radical cure 14 days.'},
+/* ---- OBG ---- */
+{name:'Folic Acid 5mg (OBG)',cat:'OBG/Nutritional',dose_mgkg:0,max_mg:5,freq:['OD'],forms:{tab:'5mg Tab'},note:'Preconception and early pregnancy. Megaloblastic anemia. Neural tube defect prevention.'},
+{name:'Iron + Folic Acid (OBG)',cat:'OBG/Nutritional',dose_mgkg:0,max_mg:0,freq:['OD','BD'],forms:{tab:'100mg Ferrous Sulfate + 0.5mg Folic Acid Tab'},note:'Antenatal iron supplementation. Take on empty stomach with Vit C juice.'},
+{name:'Calcium Carbonate (OBG)',cat:'OBG/Nutritional',dose_mgkg:0,max_mg:2000,freq:['BD'],forms:{tab:'500mg/1.25g Tab (500mg elemental Ca)'},note:'Antenatal calcium: 1-2g/day elemental calcium. Pre-eclampsia prevention at risk.'},
+{name:'Nifedipine',cat:'OBG/CCB/Tocolytic',dose_mgkg:0,max_mg:120,freq:['TDS','Q6h'],forms:{tab:'5mg/10mg Cap; 30mg/60mg SR Tab'},note:'Tocolysis, hypertension in pregnancy. Avoid sublingual route.'},
+/* ---- ORTHO ---- */
+{name:'Diclofenac',cat:'NSAID (Ortho)',dose_mgkg:2,max_mg:150,freq:['BD','TDS'],forms:{drops:'15mg/5ml Drops',syrup:'15mg/5ml Syrup',tab:'50mg/75mg Tab; 1% Gel topical'},note:'>6 months. GI side effects. Lowest effective dose. Take with food.'},
+{name:'Meloxicam',cat:'NSAID (COX-2 pref)',dose_mgkg:0.25,max_mg:15,freq:['OD'],forms:{tab:'7.5mg/15mg Tab'},note:'JIA (>2yr). OD dosing. Less GI than non-selective NSAIDs. Take with food.'},
+{name:'Baclofen',cat:'Muscle Relaxant',dose_mgkg:1,max_mg:40,freq:['TDS'],forms:{syrup:'5mg/5ml Suspension',tab:'10mg/25mg Tab'},note:'Spasticity. Do not stop abruptly. Drowsiness, weakness.'},
+{name:'Calcium + Vit D3',cat:'Bone Health',dose_mgkg:0,max_mg:2000,freq:['BD'],forms:{tab:'500mg Ca + 250IU Vit D3 Tab'},note:'Calcium: 500-1000 mg/day elemental. Vit D3: 400-1000 IU/day. Take with meals.'},
+/* ---- DERMATOLOGY ---- */
+{name:'Mupirocin',cat:'Topical Antibiotic',dose_mgkg:0,max_mg:0,freq:['BD','TDS'],forms:{drops:'N/A',syrup:'N/A',tab:'2% Cream/Ointment'},note:'Impetigo, MRSA decolonization. Topical only.'},
+{name:'Ketoconazole Shampoo',cat:'Antifungal (Topical)',dose_mgkg:0,max_mg:0,freq:['2x/week'],forms:{drops:'N/A',syrup:'N/A',tab:'2% Shampoo'},note:'Tinea capitis adjunct, seborrheic dermatitis. Leave 3-5 min.'},
+{name:'Calamine Lotion',cat:'Topical Antipruritic',dose_mgkg:0,max_mg:0,freq:['PRN'],forms:{drops:'N/A',syrup:'N/A',tab:'Lotion'},note:'Chickenpox, insect bites, urticaria, prickly heat. Shake before use.'},
+{name:'Permethrin 5%',cat:'Topical Antiparasitic',dose_mgkg:0,max_mg:0,freq:['Once, repeat 7 days'],forms:{drops:'N/A',syrup:'N/A',tab:'5% Cream'},note:'Scabies. Apply neck to toes overnight. Treat all family members.'},
+/* ---- PARACETAMOL DROPS (reference) ---- */
+{name:'Paracetamol Drops (Calpol)',cat:'Antipyretic/Analgesic',dose_mgkg:15,max_mg:500,freq:['Q4-6h'],forms:{drops:'100mg/ml Drops (1ml = 100mg)',syrup:'125mg/5ml Syrup',tab:'500mg Tab'},note:'Drops: 0.15 ml/kg/dose. Max 5 doses/24h.'},
+];
+
+// ========================================================
+// INVESTIGATIONS DATABASE
+// ========================================================
+const INVESTIGATIONS = {
+  heme:['CBC with differential','Hemoglobin','PCV/Hematocrit','Peripheral Blood Smear','Reticulocyte Count','ESR','Bleeding Time / Clotting Time','PT / INR / aPTT'],
+  bio:['Blood Glucose (Fasting/PP/Random)','Serum Electrolytes (Na, K, Cl)','Blood Urea Nitrogen (BUN)','Serum Creatinine','Uric Acid','Calcium / Phosphorus / Alkaline Phosphatase','Serum Bilirubin (Total/Direct/Indirect)','SGOT/SGPT/GGT','Total Protein / Albumin / Globulin','LDH','Serum Ferritin','Serum Iron / TIBC','Vitamin D3 (25-OH)','Thyroid Profile (T3/T4/TSH)','Serum CRP / Procalcitonin','HbA1c'],
+  micro:['Blood Culture & Sensitivity','Urine Culture & Sensitivity','Stool Culture','Throat Swab Culture','Widal Test (Typhidot/Typhifast)','Dengue NS1 / IgM / IgG','MP (Malaria Parasite) Smear','MP Antigen (RDT)','Mantoux Test (PPD)','HIV Test (ELISA)','Hepatitis B Surface Antigen (HBsAg)','Hepatitis C Antibody (Anti-HCV)','ASO Titre','CRP (Qualitative/Quantitative)'],
+  urine:['Urine Routine & Microscopy','Urine Protein (24hr)','Urine Albumin-Creatinine Ratio','Urine Bilirubin & Urobilinogen','Urine Reducing Substances'],
+  stool:['Stool Routine & Microscopy','Stool for Occult Blood','Stool for Ova & Parasites','Stool Reducing Substances'],
+  radio:['X-Ray Chest (PA view)','X-Ray Chest (AP Erect)','X-Ray Abdomen (Erect/Supine)','X-Ray Skull (AP/Lateral)','X-Ray Spine (AP/Lateral)','X-Ray Pelvis','X-Ray Long Bones','Wrist X-Ray (Bone Age)','HRCT Chest','CT Head (Plain/Contrast)','CT Abdomen & Pelvis','MRI Brain (Plain/Contrast)','MRI Spine','USG Abdomen & Pelvis','USG Cranium (neonates)','USG Doppler Renal','Echo (2D Echocardiography)','ECG (12-lead)','EEG','Bone Scan'],
+  spl:['CSF Analysis (Cell Count/Protein/Glucose/Culture)','Bone Marrow Aspiration','Pleural Fluid Analysis','Ascitic Fluid Analysis','Synovial Fluid Analysis','Nasopharyngeal Aspirate for Culture','Gastric Aspirate for AFB','Insulin / C-Peptide','IGF-1 / Growth Hormone Stimulation','ACTH Stimulation Test','Chromosomal Analysis / Karyotype','Metabolic Screen','Sweat Chloride Test (Pilocarpin Iontophoresis)','Newborn Screening']
+};
+
+// ========================================================
+// USERS
+// ========================================================
+const USERS=[
+  {id:'doc_ritik',pass:'dr1234',name:'Dr. Ritik',role:'doctor',dept:'Pediatrics',qual:'MD Pediatrics, ABVMU'},
+  {id:'doc_obg',pass:'obg1234',name:'Dr. Sangeeta Mishra',role:'doctor',dept:'OBG & Gynecology',qual:'MS OBG'},
+  {id:'doc_gm',pass:'gm1234',name:'Dr. Arun Kumar',role:'doctor',dept:'General Medicine',qual:'MD General Medicine'},
+  {id:'doc_ortho',pass:'ortho1234',name:'Dr. Mahesh Singh',role:'doctor',dept:'Orthopedics',qual:'MS Orthopedics'},
+  {id:'nurse1',pass:'nurse1234',name:'Nurse Priya Sharma',role:'nurse',dept:'General',qual:'GNM'},
+  {id:'nurse2',pass:'nurse1234',name:'Nurse Rekha Devi',role:'nurse',dept:'General',qual:'ANM'}
+];
+
+// ========================================================
+// DOSE CALCULATOR
+// ========================================================
+function calcDose(drug, weight, dob){
+  if(!drug||!weight||weight<=0) return null;
+  const ageMonths=dob?ageInMonths(dob):999;
+  const ageYears=Math.floor(ageMonths/12);
+  const d=DRUGS.find(x=>x.name===drug);
+  if(!d||!d.dose_mgkg) return null;
+  const mgPerDose=Math.min(d.dose_mgkg*weight, d.max_mg||99999);
+  const result={mgDose:Math.round(mgPerDose*10)/10,ageYears,ageMonths,drug:d};
+  // Determine form and ml
+  if(ageMonths<12){
+    // DROPS preferred
+    result.formType='drops';
+    result.formLabel=d.forms.drops;
+    const conc=parseDropConc(d.forms.drops);
+    if(conc) result.ml=Math.round((mgPerDose/conc)*10)/10;
+  } else if(ageYears<6){
+    // SYRUP in ml
+    result.formType='syrup';
+    result.formLabel=d.forms.syrup;
+    const conc=parseSyrupConc(d.forms.syrup);
+    if(conc) result.ml=Math.round((mgPerDose/conc)*10)/10;
+  } else {
+    // TABLETS
+    result.formType='tab';
+    result.formLabel=d.forms.tab;
+    result.ml=null;
+    const ts=parseTabStrength(d.forms.tab);
+    if(ts) result.tabs=Math.round((mgPerDose/ts)*2)/2; // round to 0.5 tabs
+  }
+  return result;
+}
+
+function parseDropConc(str){
+  if(!str) return null;
+  // "100mg/ml" → 100, "15mg/ml" → 15, "50mg/ml" → 50
+  const m=str.match(/(\d+\.?\d*)\s*mg\/ml/i);
+  if(m) return parseFloat(m[1]);
+  // "100mg/1ml drops" or "1mg/ml Drops"
+  const m2=str.match(/(\d+\.?\d*)\s*mg/i);
+  if(m2) return parseFloat(m2[1]);
+  return null;
+}
+
+function parseSyrupConc(str){
+  if(!str) return null;
+  // "125mg/5ml" → 25mg/ml, "200mg/5ml" → 40mg/ml, "50mg/5ml" → 10mg/ml
+  const m=str.match(/(\d+\.?\d*)\s*mg\/(\d+\.?\d*)\s*ml/i);
+  if(m) return parseFloat(m[1])/parseFloat(m[2]);
+  return null;
+}
+
+function parseTabStrength(str){
+  if(!str) return null;
+  // "500mg Tab" → 500, "250mg/500mg" → 250 (lowest), "100mg Tab" → 100
+  const m=str.match(/(\d+)\s*mg/i);
+  if(m) return parseFloat(m[1]);
+  return null;
+}
+
+function formatDoseHint(res, drug){
+  if(!res) return '';
+  let hint=`<b>${res.mgDose} mg/dose</b> (${drug.dose_mgkg} mg/kg × weight)`;
+  if(res.formType==='drops'&&res.ml){
+    hint+=`<br>💧 <b>Drops:</b> <span style="color:#1d4ed8;font-weight:700;">${res.ml} ml</span> — ${res.formLabel}`;
+  } else if(res.formType==='syrup'&&res.ml){
+    hint+=`<br>🥄 <b>Syrup:</b> <span style="color:#059669;font-weight:700;">${res.ml} ml</span> — ${res.formLabel}`;
+  } else if(res.formType==='tab'){
+    hint+=`<br>💊 <b>Tablet:</b>${res.tabs?` <span style="color:#7c3aed;font-weight:700;">${res.tabs} tab</span> of`:''}  ${res.formLabel}`;
+  }
+  if(drug.max_mg&&res.mgDose>=drug.max_mg*0.9){
+    hint+=`<br>⚠️ Near/at max dose (${drug.max_mg}mg)`;
+  }
+  hint+=`<br><span style="color:#6b7280;font-size:10.5px;">${drug.note}</span>`;
+  return hint;
+}
+
+// ========================================================
+// APP STATE
+// ========================================================
+let S={user:null,view:'dash',pts:[],visits:[],selPt:null,loginRole:'doctor',rxDrugs:[],selInv:{}};
+function save(){try{localStorage.setItem('chwh2_pts',JSON.stringify(S.pts));localStorage.setItem('chwh2_visits',JSON.stringify(S.visits));}catch(e){}}
+function load(){try{const p=localStorage.getItem('chwh2_pts'),v=localStorage.getItem('chwh2_visits');if(p)S.pts=JSON.parse(p);if(v)S.visits=JSON.parse(v);}catch(e){}}
+function genUHID(){return 'CHWH-'+new Date().getFullYear()+'-'+String(S.pts.length+1).padStart(4,'0');}
+function uid(){return 'id_'+Date.now()+'_'+Math.random().toString(36).substr(2,8);}
+function today(){return new Date().toISOString().split('T')[0];}
+function fmtD(d){if(!d)return '-';return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}
+function ageInMonths(dob){const b=new Date(dob),n=new Date();return Math.max(0,Math.floor((n-b)/(1000*60*60*24*30.44)));}
+function ageInYears(dob){return Math.floor(ageInMonths(dob)/12);}
+function calcAge(dob){const b=new Date(dob),n=new Date();let yr=n.getFullYear()-b.getFullYear(),mo=n.getMonth()-b.getMonth();if(mo<0){yr--;mo+=12;}const d=n.getDate()-b.getDate();if(yr>=2)return yr+' yrs';if(yr>=1)return yr+' yr '+mo+' mo';return mo+' mo '+(d<0?0:d)+' days';}
+function dc(dept){if(!dept)return '';const dl=dept.toLowerCase();if(dl.includes('pedia'))return 'dp';if(dl.includes('obg')||dl.includes('gyne'))return 'do';if(dl.includes('gen'))return 'dg';if(dl.includes('ortho'))return 'dr';return 'dp';}
+function toast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';t.style.borderLeftColor=type==='success'?'#00b8a9':type==='error'?'#ef4444':'#f59e0b';setTimeout(()=>t.style.display='none',3200);}
+
+// ========================================================
+// AUTH
+// ========================================================
+function setRole(r){S.loginRole=r;document.querySelectorAll('.login-tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&r==='doctor')||(i===1&&r==='nurse')));}
+function doLogin(){
+  const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value.trim();
+  const usr=USERS.find(x=>x.id===u&&x.pass===p);
+  if(!usr){document.getElementById('lerr').textContent='Invalid credentials.';return;}
+  if(usr.role!==S.loginRole){document.getElementById('lerr').textContent='Wrong role selected.';return;}
+  S.user=usr;load();
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('main-app').classList.remove('hidden');
+  initApp();
+}
+function doLogout(){save();S.user=null;S.view='dash';S.selPt=null;document.getElementById('main-app').classList.add('hidden');document.getElementById('login-screen').classList.remove('hidden');document.getElementById('lu').value='';document.getElementById('lp').value='';document.getElementById('lerr').textContent='';}
+
+// ========================================================
+// SIDEBAR OPEN/CLOSE (MOBILE)
+// ========================================================
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sov').classList.add('show');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sov').classList.remove('show');}
+
+// ========================================================
+// INIT
+// ========================================================
+function initApp(){
+  const u=S.user;
+  document.getElementById('uav').textContent=u.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  document.getElementById('unm').textContent=u.name;
+  document.getElementById('url').textContent=u.role==='doctor'?u.dept:'Nursing Staff';
+  document.getElementById('tdate').textContent=new Date().toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+  buildSidebar();buildBottomNav();nav('dash');
+}
+
+function buildSidebar(){
+  const isDoc=S.user.role==='doctor',isNurse=S.user.role==='nurse';
+  let h='';
+  const items=isNurse?[
+    {v:'dash',icon:'🏠',label:'Dashboard'},{v:'register',icon:'➕',label:'Register Patient'},
+    {v:'patients',icon:'👥',label:'Patients'},{v:'vitals',icon:'🩺',label:'Record Vitals'},
+    {v:'queue',icon:'📋',label:'OPD Queue'}
+  ]:[
+    {v:'dash',icon:'🏠',label:'Dashboard'},{v:'queue',icon:'📋',label:'My OPD Queue'},
+    {v:'patients',icon:'👥',label:'Patients'},{v:'prescription',icon:'💊',label:'Prescription'},
+    {v:'drugdb',icon:'📚',label:'Drug Guidelines'}
+  ];
+  h=`<div class="nav-sec">Navigation</div>`;
+  items.forEach(it=>h+=`<div class="nav-item ${S.view===it.v?'active':''}" onclick="nav('${it.v}');closeSidebar();"><span class="nav-icon">${it.icon}</span>${it.label}</div>`);
+  document.getElementById('snav').innerHTML=h;
+}
+
+function buildBottomNav(){
+  const isNurse=S.user.role==='nurse';
+  const items=isNurse?[
+    {v:'dash',icon:'🏠',label:'Home'},{v:'register',icon:'➕',label:'Register'},
+    {v:'patients',icon:'👥',label:'Patients'},{v:'vitals',icon:'🩺',label:'Vitals'},{v:'queue',icon:'📋',label:'Queue'}
+  ]:[
+    {v:'dash',icon:'🏠',label:'Home'},{v:'queue',icon:'📋',label:'Queue'},
+    {v:'patients',icon:'👥',label:'Patients'},{v:'prescription',icon:'💊',label:'Rx'},{v:'drugdb',icon:'📚',label:'Drugs'}
+  ];
+  document.getElementById('bnav').innerHTML=items.map(it=>`<button class="bn-item ${S.view===it.v?'active':''}" onclick="nav('${it.v}')"><span class="bn-icon">${it.icon}</span><span class="bn-lbl">${it.label}</span></button>`).join('');
+}
+
+function nav(v,data){
+  S.view=v;if(data)S.selPt=data;
+  buildSidebar();buildBottomNav();
+  const titles={dash:'Dashboard',register:'Register Patient',patients:'Patient Records',vitals:'Record Vitals',queue:"Today's OPD Queue",prescription:'Write Prescription',drugdb:'Drug Guidelines',ptdetail:'Patient Record'};
+  document.getElementById('ttitle').textContent=titles[v]||'OPD System';
+  render(v);
+}
+
+// ========================================================
+// RENDER ROUTER
+// ========================================================
+function render(v){
+  const a=document.getElementById('carea');
+  if(v==='dash')a.innerHTML=rDash();
+  else if(v==='register')a.innerHTML=rRegister();
+  else if(v==='patients')a.innerHTML=rPatients();
+  else if(v==='vitals')a.innerHTML=rVitals();
+  else if(v==='queue')a.innerHTML=rQueue();
+  else if(v==='prescription')a.innerHTML=rPrescription();
+  else if(v==='drugdb')a.innerHTML=rDrugDB();
+  else if(v==='ptdetail')a.innerHTML=rPtDetail();
+  setupEnterNav();
+}
+
+// ========================================================
+// ENTER KEY NAVIGATION (universal)
+// ========================================================
+function setupEnterNav(){
+  document.querySelectorAll('.fld:not(textarea):not([data-no-enter])').forEach(el=>{
+    el.removeEventListener('keydown',enterHandler);
+    el.addEventListener('keydown',enterHandler);
+  });
+}
+function enterHandler(e){
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  const inputs=[...document.querySelectorAll('input.fld:not([disabled]):not([readonly]),select.fld:not([disabled])')];
+  const idx=inputs.indexOf(e.target);
+  if(idx>=0&&idx<inputs.length-1){inputs[idx+1].focus();inputs[idx+1].select&&inputs[idx+1].select();}
+  else{const btn=document.querySelector('.btn-primary:not([disabled])');if(btn)btn.click();}
+}
+
+// ========================================================
+// DASHBOARD
+// ========================================================
+function rDash(){
+  const tv=S.visits.filter(v=>v.date===today());
+  const isDoc=S.user.role==='doctor';
+  const mq=isDoc?S.visits.filter(v=>v.date===today()&&v.dept===S.user.dept):[];
+  const depts={Pediatrics:0,'OBG & Gynecology':0,'General Medicine':0,'Orthopedics':0};
+  tv.forEach(v=>{if(depts[v.dept]!==undefined)depts[v.dept]++;});
+  return `
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num">${S.pts.length}</div><div class="stat-lbl">Total Patients</div></div>
+    <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-num">${tv.length}</div><div class="stat-lbl">Today's OPD</div></div>
+    <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-num">${tv.filter(v=>v.status==='done').length}</div><div class="stat-lbl">Consultations Done</div></div>
+    <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-num">${tv.filter(v=>v.status!=='done').length}</div><div class="stat-lbl">Waiting</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="card"><div class="card-hd"><div class="card-title">Dept-wise Today</div></div><div class="card-body">
+      ${Object.entries(depts).map(([d,c])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;">${d}</span><span class="badge ${dc(d)}">${c}</span></div>`).join('')}
+    </div></div>
+    <div class="card"><div class="card-hd"><div class="card-title">${isDoc?'My Queue (Today)':'Recent Patients'}</div></div><div class="card-body">
+      ${isDoc?(mq.length===0?'<div class="empty" style="padding:20px"><div class="empty-icon" style="font-size:30px;">📋</div><p>No patients yet today</p></div>':
+        mq.slice(0,5).map(v=>{const pt=S.pts.find(p=>p.id===v.ptId);if(!pt)return '';return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);"><div><div style="font-size:13px;font-weight:600;">${pt.name}</div><div style="font-size:11.5px;color:var(--muted);">${pt.uhid} · ${calcAge(pt.dob)}</div></div><span class="badge s${v.status[0]}">${v.status}</span></div>`}).join(''))
+      :(S.pts.slice(-5).reverse().map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);"><div><div style="font-size:13px;font-weight:600;">${p.name}</div><div style="font-size:11.5px;color:var(--muted);">${p.uhid} · ${calcAge(p.dob)}</div></div><span class="badge ${dc(p.dept)}">${p.dept.split(' ')[0]}</span></div>`).join('')||'<div class="empty" style="padding:20px"><div class="empty-icon" style="font-size:30px;">👥</div><p>No patients yet</p></div>')}
+    </div></div>
+  </div>`;
+}
+
+// ========================================================
+// REGISTER
+// ========================================================
+function rRegister(){
+  return `<div class="card"><div class="card-hd"><div class="card-title">➕ Register New Patient</div></div><div class="card-body">
+  <div class="fg">
+    <div class="field"><label class="req">Full Name</label><input id="rg-name" class="fld" placeholder="Patient's full name"></div>
+    <div class="field"><label class="req">Date of Birth</label><input id="rg-dob" type="date" class="fld" max="${today()}"></div>
+    <div class="field"><label class="req">Gender</label><select id="rg-sex" class="fld"><option value="">Select</option><option value="male">♂ Male</option><option value="female">♀ Female</option></select></div>
+    <div class="field"><label class="req">Department</label><select id="rg-dept" class="fld"><option value="">Select Department</option><option value="Pediatrics">Pediatrics</option><option value="OBG & Gynecology">OBG & Gynecology</option><option value="General Medicine">General Medicine</option><option value="Orthopedics">Orthopedics</option></select></div>
+    <div class="field"><label>Phone Number</label><input id="rg-phone" class="fld" type="tel" placeholder="10-digit mobile"></div>
+    <div class="field"><label>Father/Guardian</label><input id="rg-guardian" class="fld" placeholder="Parent/Guardian name"></div>
+    <div class="field sp3"><label>Address</label><input id="rg-addr" class="fld" placeholder="Full residential address"></div>
+    <div class="field"><label>Known Allergies</label><input id="rg-allergy" class="fld" placeholder="Drug/food allergies"></div>
+    <div class="field"><label>Blood Group</label><select id="rg-bg" class="fld"><option value="">Unknown</option>${['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(b=>`<option>${b}</option>`).join('')}</select></div>
+    <div class="field"><label>Referred By</label><input id="rg-ref" class="fld" placeholder="Referral source"></div>
+  </div>
+  <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="doRegister()">✅ Register & Generate UHID</button>
+    <button class="btn btn-outline" onclick="render('register')">🔄 Clear</button>
+  </div>
+  </div></div>`;
+}
+
+function doRegister(){
+  const name=document.getElementById('rg-name').value.trim();
+  const dob=document.getElementById('rg-dob').value;
+  const sex=document.getElementById('rg-sex').value;
+  const dept=document.getElementById('rg-dept').value;
+  if(!name||!dob||!sex||!dept){toast('Fill all required fields (*)','error');return;}
+  const pt={id:uid(),uhid:genUHID(),name,dob,sex,dept,phone:document.getElementById('rg-phone').value,guardian:document.getElementById('rg-guardian').value,addr:document.getElementById('rg-addr').value,allergy:document.getElementById('rg-allergy').value,bg:document.getElementById('rg-bg').value,ref:document.getElementById('rg-ref').value,regDate:today()};
+  S.pts.push(pt);
+  const visit={id:uid(),ptId:pt.id,date:today(),dept,status:'waiting',vitals:{},anthro:{},complaints:'',exam:'',diag:'',rx:[],inv:[],instructions:'',followup:'',docId:'',docName:'',createdAt:new Date().toISOString()};
+  S.visits.push(visit);save();
+  toast('Registered! UHID: '+pt.uhid);
+  showModal(`<div class="modal-hd"><h3>✅ Patient Registered</h3><button class="modal-cls" onclick="closeModal()">×</button></div>
+  <div class="modal-body">
+    <div class="alert alert-success"><b>${pt.name}</b> registered successfully.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+      <div class="stat-card"><div class="stat-lbl">UHID</div><div style="font-size:19px;font-weight:800;color:var(--teal);">${pt.uhid}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Age</div><div style="font-size:17px;font-weight:700;">${calcAge(pt.dob)}</div></div>
+    </div>
+    <p style="margin-top:12px;font-size:13px;color:var(--muted);">Added to <b>${dept}</b> OPD queue. Nursing staff can record vitals.</p>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-teal" onclick="closeModal();quickVitals('${pt.id}')">Record Vitals</button>
+    <button class="btn btn-outline" onclick="closeModal();render('register')">Register Another</button>
+  </div>`);
+}
+
+// ========================================================
+// PATIENTS
+// ========================================================
+function rPatients(){
+  const q=(document.getElementById('ptsearch')||{value:''}).value?.toLowerCase()||'';
+  const filt=S.pts.filter(p=>!q||p.name.toLowerCase().includes(q)||p.uhid.toLowerCase().includes(q)||(p.phone&&p.phone.includes(q)));
+  return `<div class="card"><div class="card-hd"><div class="card-title">Patients (${filt.length})</div>${S.user.role==='nurse'?`<button class="btn btn-teal btn-sm" onclick="nav('register')">➕ New</button>`:''}</div><div class="card-body">
+  <div class="sbar">
+    <input id="ptsearch" class="fld" placeholder="🔍 Name, UHID or phone..." oninput="render('patients')" value="${q}">
+    <select class="fld" onchange="render('patients')" style="max-width:160px;">
+      <option value="">All Depts</option><option value="Pediatrics">Pediatrics</option><option value="OBG">OBG</option><option value="General Medicine">General Medicine</option><option value="Orthopedics">Orthopedics</option>
+    </select>
+  </div>
+  <div style="overflow-x:auto;">
+  <table class="pt-table"><thead><tr><th>UHID</th><th>Patient</th><th>Age/Sex</th><th>Dept</th><th>Phone</th><th>Reg Date</th><th>Actions</th></tr></thead><tbody>
+  ${filt.length===0?`<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted);">No patients found</td></tr>`:
+    filt.map(p=>`<tr>
+    <td><span class="uhid">${p.uhid}</span></td>
+    <td><b>${p.name}</b>${p.guardian?`<div style="font-size:11px;color:var(--muted);">${p.guardian}</div>`:''}</td>
+    <td>${calcAge(p.dob)}/${p.sex==='male'?'M':'F'}</td>
+    <td><span class="badge ${dc(p.dept)}">${p.dept.split(' ')[0]}</span></td>
+    <td style="font-size:12.5px;">${p.phone||'-'}</td>
+    <td style="font-size:12px;">${fmtD(p.regDate)}</td>
+    <td style="white-space:nowrap;">
+      <button class="btn btn-outline btn-xs" onclick="viewPt('${p.id}')">👁</button>
+      ${S.user.role==='nurse'?`<button class="btn btn-teal btn-xs" style="margin-left:4px;" onclick="quickVitals('${p.id}')">🩺</button>`:''}
+      ${S.user.role==='doctor'?`<button class="btn btn-primary btn-xs" style="margin-left:4px;" onclick="openRx('${p.id}')">💊</button>`:''}
+    </td>
+  </tr>`).join('')}
+  </tbody></table>
+  </div></div></div>`;
+}
+
+function viewPt(id){S.selPt=S.pts.find(p=>p.id===id);nav('ptdetail');}
+function quickVitals(id){S.selPt=S.pts.find(p=>p.id===id);nav('vitals');}
+function openRx(id){S.selPt=S.pts.find(p=>p.id===id);S.rxDrugs=[];S.selInv={};nav('prescription');}
+
+// ========================================================
+// QUEUE
+// ========================================================
+function rQueue(){
+  const isDoc=S.user.role==='doctor';
+  const tv=S.visits.filter(v=>v.date===today()&&(isDoc?v.dept===S.user.dept:true));
+  return `<div class="card"><div class="card-hd"><div class="card-title">📋 ${isDoc?S.user.dept+' OPD':"Today's OPD"} — ${fmtD(today())}</div><span style="font-size:13px;color:var(--muted);">${tv.length} patients</span></div><div class="card-body">
+  ${tv.length===0?'<div class="empty"><div class="empty-icon">📭</div><p>No patients in queue today</p></div>':''}
+  ${tv.length>0?`<div style="overflow-x:auto;"><table class="pt-table"><thead><tr><th>#</th><th>UHID</th><th>Patient</th><th>Age</th><th>Dept</th><th>Vitals</th><th>Status</th><th>Action</th></tr></thead><tbody>
+  ${tv.map((v,i)=>{const pt=S.pts.find(p=>p.id===v.ptId);if(!pt)return '';const hv=v.vitals&&Object.keys(v.vitals).length>0;return `<tr>
+    <td style="color:var(--muted);font-size:12px;">${i+1}</td>
+    <td><span class="uhid">${pt.uhid}</span></td>
+    <td><b>${pt.name}</b>${pt.guardian?`<div style="font-size:11px;color:var(--muted);">${pt.guardian}</div>`:''}</td>
+    <td style="font-size:12.5px;">${calcAge(pt.dob)}</td>
+    <td><span class="badge ${dc(v.dept)}">${v.dept.split(' ')[0]}</span></td>
+    <td>${hv?`<span style="color:var(--success);font-size:12px;">✅</span>`:`<span style="color:var(--warn);font-size:12px;">⚠</span>`}</td>
+    <td><select onchange="updSt('${v.id}',this.value)" style="padding:4px 7px;border:2px solid var(--border);border-radius:6px;font-family:var(--font);font-size:12px;outline:none;">
+      <option value="waiting" ${v.status==='waiting'?'selected':''}>⏳ Waiting</option>
+      <option value="inprogress" ${v.status==='inprogress'?'selected':''}>🔵 In Progress</option>
+      <option value="done" ${v.status==='done'?'selected':''}>✅ Done</option>
+    </select></td>
+    <td style="white-space:nowrap;">
+      <button class="btn btn-outline btn-xs" onclick="viewPt('${pt.id}')">👁</button>
+      ${S.user.role==='nurse'?`<button class="btn btn-teal btn-xs" style="margin-left:4px;" onclick="quickVitals('${pt.id}')">🩺</button>`:''}
+      ${S.user.role==='doctor'?`<button class="btn btn-primary btn-xs" style="margin-left:4px;" onclick="openRx('${pt.id}')">💊</button>`:''}
+    </td>
+  </tr>`;}).join('')}
+  </tbody></table></div>`:''}
+  </div></div>`;
+}
+function updSt(vid,st){const v=S.visits.find(x=>x.id===vid);if(v){v.status=st;save();}}
+
+// ========================================================
+// VITALS
+// ========================================================
+function rVitals(){
+  const sp=S.selPt;
+  return `<div class="card"><div class="card-hd"><div class="card-title">🩺 Record Patient Vitals</div></div><div class="card-body">
+  <div class="field" style="margin-bottom:16px;max-width:420px;">
+    <label>Select Patient</label>
+    <select id="vsel" class="fld" onchange="onVitSel(this.value)">
+      <option value="">-- Select Patient --</option>
+      ${S.pts.map(p=>`<option value="${p.id}" ${sp&&sp.id===p.id?'selected':''}>${p.uhid} — ${p.name} (${calcAge(p.dob)})</option>`).join('')}
+    </select>
+  </div>
+  <div id="vform">${sp?rVitForm(sp):'<div class="alert alert-info">Select a patient above to record vitals.</div>'}</div>
+  </div></div>`;
+}
+function onVitSel(id){S.selPt=S.pts.find(p=>p.id===id)||null;document.getElementById('vform').innerHTML=S.selPt?rVitForm(S.selPt):'<div class="alert alert-info">Select a patient above.</div>';}
+function rVitForm(pt){
+  const mos=ageInMonths(pt.dob),is5=mos<60;
+  const tv=S.visits.find(v=>v.ptId===pt.id&&v.date===today());
+  const ev=tv&&tv.vitals?tv.vitals:{};
+  return `<div class="alert alert-info">Recording for: <b>${pt.name}</b> · ${pt.uhid} · ${calcAge(pt.dob)} · ${pt.sex==='male'?'♂ Male':'♀ Female'}${pt.allergy?`<br><span style="color:#ef4444;font-weight:600;">⚠ Allergy: ${pt.allergy}</span>`:''}</div>
+  <div class="vg">
+    <div class="field"><label>Temp (°C)</label><input id="vt" class="fld" type="number" step="0.1" placeholder="37.0" value="${ev.temp||''}"></div>
+    <div class="field"><label>HR (bpm)</label><input id="vhr" class="fld" type="number" placeholder="80" value="${ev.hr||''}"></div>
+    <div class="field"><label>RR (/min)</label><input id="vrr" class="fld" type="number" placeholder="20" value="${ev.rr||''}"></div>
+    <div class="field"><label>SpO₂ (%)</label><input id="vspo" class="fld" type="number" placeholder="99" value="${ev.spo2||''}"></div>
+    <div class="field"><label>BP Sys (mmHg)</label><input id="vbps" class="fld" type="number" placeholder="110" value="${ev.bps||''}"></div>
+    <div class="field"><label>BP Dia (mmHg)</label><input id="vbpd" class="fld" type="number" placeholder="70" value="${ev.bpd||''}"></div>
+    <div class="field"><label>Weight (kg)</label><input id="vwt" class="fld" type="number" step="0.1" placeholder="15.0" value="${ev.weight||''}"></div>
+    <div class="field"><label>Height/Length (cm)</label><input id="vht" class="fld" type="number" step="0.1" placeholder="100.0" value="${ev.height||''}"></div>
+    ${is5?`<div class="field"><label>MUAC (cm) [6-59mo]</label><input id="vmuac" class="fld" type="number" step="0.1" placeholder="14.0" value="${ev.muac||''}"></div>`:''}
+    <div class="field"><label>Nursing Notes</label><input id="vnotes" class="fld" placeholder="Observations..." value="${ev.notes||''}"></div>
+  </div>
+  <div id="apreview"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="saveVitals('${pt.id}')">💾 Save Vitals</button>
+    <button class="btn btn-outline" onclick="previewAnthro('${pt.id}')">📊 Preview Anthropometry</button>
+  </div>`;
+}
+
+// Z-score (simplified WHO)
+const WFA_B={0:[3.3,2.9,2.5,2.1],3:[6.4,5.7,5.0,4.3],6:[7.9,7.1,6.3,5.5],9:[9.0,8.1,7.2,6.3],12:[9.7,8.7,7.7,6.8],18:[10.9,9.7,8.6,7.6],24:[12.0,10.6,9.4,8.3],36:[14.3,12.6,11.1,9.8],48:[16.3,14.4,12.7,11.1],60:[18.3,16.1,14.1,12.3]};
+const WFA_G={0:[3.2,2.8,2.4,2.0],3:[5.8,5.2,4.5,4.0],6:[7.3,6.5,5.7,5.0],9:[8.2,7.3,6.4,5.6],12:[8.9,7.9,6.9,6.0],18:[10.2,9.0,7.9,6.9],24:[11.5,10.2,8.9,7.8],36:[13.9,12.2,10.7,9.3],48:[15.9,13.9,12.1,10.5],60:[17.9,15.7,13.6,11.8]};
+const HFA_B={0:[49.9,47.5,45.2,42.8],3:[61.4,58.5,55.6,52.7],6:[67.6,64.4,61.2,58.0],9:[72.0,68.7,65.5,62.3],12:[75.7,72.1,68.6,65.1],18:[82.3,78.1,74.1,70.1],24:[87.8,83.6,79.3,75.1],36:[96.1,91.5,86.9,82.4],48:[103.3,98.4,93.5,88.6],60:[110.0,104.7,99.4,94.1]};
+const HFA_G={0:[49.1,46.8,44.5,42.3],3:[59.8,57.0,54.3,51.5],6:[65.7,62.5,59.3,56.2],9:[70.1,66.7,63.3,60.0],12:[74.0,70.3,66.7,63.1],18:[80.7,76.5,72.3,68.2],24:[86.4,82.0,77.7,73.3],36:[95.1,90.5,85.9,81.3],48:[102.7,97.7,92.7,87.7],60:[109.4,104.2,98.9,93.7]};
+function getZ(val,mos,sex,type){
+  const T=type==='wfa'?(sex==='male'?WFA_B:WFA_G):(sex==='male'?HFA_B:HFA_G);
+  const ages=Object.keys(T).map(Number).sort((a,b)=>a-b);
+  let lo=ages[0];
+  for(let a of ages){if(a<=mos)lo=a;}
+  const ref=T[lo];if(!ref)return null;
+  const [med,m1,m2,m3]=ref;
+  const sd=(med-m2)/2;if(sd===0)return null;
+  return Math.round((val-med)/sd*10)/10;
+}
+function getWHZ(wt,ht,sex){
+  const r=[[65,7.0,6.7],[70,8.0,7.6],[75,9.0,8.6],[80,9.9,9.5],[85,10.8,10.4],[90,11.8,11.4],[95,12.9,12.5],[100,14.0,13.6],[105,15.2,14.8],[110,16.4,16.1],[115,17.7,17.4],[120,19.0,18.7]];
+  if(ht<65||ht>120)return null;
+  let lo=r[0],hi=r[r.length-1];
+  for(let i=0;i<r.length-1;i++){if(r[i][0]<=ht&&r[i+1][0]>ht){lo=r[i];hi=r[i+1];break;}}
+  const t=(ht-lo[0])/(hi[0]-lo[0]);const med=lo[sex==='male'?1:2]+(hi[sex==='male'?1:2]-lo[sex==='male'?1:2])*t;
+  return Math.round((wt-med)/(med*0.11)*10)/10;
+}
+function intZ(z){if(z===null)return{c:'',t:''};if(z<-3)return{c:'zd',t:'SAM (-3SD)'};if(z<-2)return{c:'zw',t:'MAM (-2SD)'};if(z<-1)return{c:'zw',t:'Mild ↓ (-1SD)'};if(z>2)return{c:'zn',t:'Above +2SD'};return{c:'zn',t:'Normal'};}
+function intMUAC(m,mos){if(!m||mos<6||mos>59)return null;if(m<11.5)return{c:'muac-r',t:'SAM <11.5cm'};if(m<12.5)return{c:'muac-y',t:'MAM 11.5–12.5cm'};return{c:'muac-g',t:'Normal ≥12.5cm'};}
+
+function previewAnthro(ptId){
+  const pt=S.pts.find(p=>p.id===ptId);if(!pt)return;
+  const wt=parseFloat(document.getElementById('vwt').value);
+  const ht=parseFloat(document.getElementById('vht').value);
+  const muacEl=document.getElementById('vmuac');const muac=muacEl?parseFloat(muacEl.value):null;
+  const mos=ageInMonths(pt.dob),yrs=ageInYears(pt.dob);
+  if(!wt&&!ht){document.getElementById('apreview').innerHTML='<div class="alert alert-warn">Enter weight/height first.</div>';return;}
+  const waz=wt?getZ(wt,mos,pt.sex,'wfa'):null;
+  const haz=ht?getZ(ht,mos,pt.sex,'hfa'):null;
+  const whz=(wt&&ht&&mos<60)?getWHZ(wt,ht,pt.sex):null;
+  const bmi=wt&&ht?Math.round(wt/Math.pow(ht/100,2)*10)/10:null;
+  const mi=intMUAC(muac,mos);
+  if(mos<60){
+    document.getElementById('apreview').innerHTML=`<div class="anthro-box">
+      <div style="font-size:12px;font-weight:600;opacity:.7;margin-bottom:8px;">📊 WHO Anthropometry — Under 5 years</div>
+      <div class="ar">
+        ${waz!==null?`<div class="ai"><div class="av ${intZ(waz).c}">${waz}</div><div class="al">WAZ<br><small>${intZ(waz).t}</small></div></div>`:''}
+        ${haz!==null?`<div class="ai"><div class="av ${intZ(haz).c}">${haz}</div><div class="al">HAZ<br><small>${intZ(haz).t}</small></div></div>`:''}
+        ${whz!==null?`<div class="ai"><div class="av ${intZ(whz).c}">${whz}</div><div class="al">WHZ<br><small>${intZ(whz).t}</small></div></div>`:''}
+        ${mi?`<div class="ai"><div class="av"><span class="${mi.c}">${muac}cm</span></div><div class="al">MUAC<br><small>${mi.t}</small></div></div>`:''}
+      </div></div>`;
+  } else {
+    const bmiI=bmi?(bmi<16?'Severely Underweight':bmi<18.5?'Underweight':bmi<23?'Normal':bmi<27?'Overweight':'Obese'):'';
+    document.getElementById('apreview').innerHTML=`<div class="anthro-box"><div style="font-size:12px;font-weight:600;opacity:.7;margin-bottom:8px;">📊 Anthropometry — 5+ years (BMI)</div><div class="ar">
+      ${wt?`<div class="ai"><div class="av zn">${wt}kg</div><div class="al">Weight</div></div>`:''}
+      ${ht?`<div class="ai"><div class="av zn">${ht}cm</div><div class="al">Height</div></div>`:''}
+      ${bmi?`<div class="ai"><div class="av ${bmi<18.5?'zw':'zn'}">${bmi}</div><div class="al">BMI<br><small>${bmiI}</small></div></div>`:''}
+    </div></div>`;
+  }
+}
+
+function saveVitals(ptId){
+  const pt=S.pts.find(p=>p.id===ptId);if(!pt)return;
+  const wt=parseFloat(document.getElementById('vwt').value)||null;
+  const ht=parseFloat(document.getElementById('vht').value)||null;
+  const muacEl=document.getElementById('vmuac');const muac=muacEl?parseFloat(muacEl.value)||null:null;
+  const mos=ageInMonths(pt.dob);
+  const vitals={temp:parseFloat(document.getElementById('vt').value)||null,hr:parseInt(document.getElementById('vhr').value)||null,rr:parseInt(document.getElementById('vrr').value)||null,spo2:parseInt(document.getElementById('vspo').value)||null,bps:parseInt(document.getElementById('vbps').value)||null,bpd:parseInt(document.getElementById('vbpd').value)||null,weight:wt,height:ht,muac,notes:document.getElementById('vnotes').value,recordedAt:new Date().toISOString(),recordedBy:S.user.name};
+  const anthro={waz:wt?getZ(wt,mos,pt.sex,'wfa'):null,haz:ht?getZ(ht,mos,pt.sex,'hfa'):null,whz:(wt&&ht&&mos<60)?getWHZ(wt,ht,pt.sex):null,bmi:wt&&ht?Math.round(wt/Math.pow(ht/100,2)*10)/10:null,muac,muacI:intMUAC(muac,mos)};
+  let tv=S.visits.find(v=>v.ptId===ptId&&v.date===today());
+  if(!tv){tv={id:uid(),ptId,date:today(),dept:pt.dept,status:'waiting',vitals:{},anthro:{},complaints:'',exam:'',diag:'',rx:[],inv:[],instructions:'',followup:'',docId:'',docName:'',createdAt:new Date().toISOString()};S.visits.push(tv);}
+  tv.vitals=vitals;tv.anthro=anthro;save();
+  toast('Vitals saved!');previewAnthro(ptId);
+}
+
+// ========================================================
+// PATIENT DETAIL
+// ========================================================
+function rPtDetail(){
+  const pt=S.selPt;if(!pt)return '<div class="alert alert-warn">No patient selected.</div>';
+  const visits=S.visits.filter(v=>v.ptId===pt.id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const lv=visits[0];const vit=lv&&lv.vitals?lv.vitals:{};const ant=lv&&lv.anthro?lv.anthro:{};
+  const mos=ageInMonths(pt.dob);
+  return `
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div><h2 style="font-size:19px;font-weight:800;">${pt.name}</h2>
+    <div style="font-size:13px;color:var(--muted);margin-top:3px;">${pt.uhid} · ${calcAge(pt.dob)} · ${pt.sex==='male'?'♂ M':'♀ F'} · <span class="badge ${dc(pt.dept)}">${pt.dept}</span></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${S.user.role==='nurse'?`<button class="btn btn-teal btn-sm" onclick="quickVitals('${pt.id}')">🩺 Vitals</button>`:''}
+      ${S.user.role==='doctor'?`<button class="btn btn-primary btn-sm" onclick="openRx('${pt.id}')">💊 New Rx</button>`:''}
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;">
+    <div>
+    <div class="card"><div class="card-hd"><div class="card-title">Demographics</div></div><div class="card-body" style="padding:14px;">
+      ${[['DOB',fmtD(pt.dob)],['Age',calcAge(pt.dob)],['Sex',pt.sex==='male'?'Male':'Female'],['Blood Group',pt.bg||'Unknown'],['Phone',pt.phone||'-'],['Guardian',pt.guardian||'-'],['Address',pt.addr||'-'],['Allergies',pt.allergy||'None']].map(([l,v])=>`<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:12.5px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;">${l}</span><br><span style="font-weight:600;">${v}</span></div>`).join('')}
+    </div></div>
+    ${Object.keys(vit).length>0?`<div class="card"><div class="card-hd"><div class="card-title">Latest Vitals</div><span class="text-sm" style="font-size:12px;color:var(--muted);">${fmtD(lv.date)}</span></div><div class="card-body" style="padding:14px;">
+      ${[['Temp',vit.temp?vit.temp+'°C':'-'],['HR',vit.hr?vit.hr+' bpm':'-'],['RR',vit.rr?vit.rr+'/min':'-'],['SpO₂',vit.spo2?vit.spo2+'%':'-'],['BP',vit.bps&&vit.bpd?vit.bps+'/'+vit.bpd+' mmHg':'-'],['Weight',vit.weight?vit.weight+' kg':'-'],['Height',vit.height?vit.height+' cm':'-'],['MUAC',vit.muac?vit.muac+' cm':'-']].map(([l,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12.5px;"><span style="color:var(--muted);">${l}</span><b>${v}</b></div>`).join('')}
+      ${ant.waz!==null&&ant.waz!==undefined?`<div style="margin-top:8px;font-size:11.5px;color:var(--teal);">WAZ:${ant.waz} · HAZ:${ant.haz} · ${mos<60?'WHZ:'+ant.whz:'BMI:'+ant.bmi}</div>`:''}
+    </div></div>`:''}
+    </div>
+    <div class="card"><div class="card-hd"><div class="card-title">Visit History (${visits.length})</div></div><div class="card-body">
+      ${visits.length===0?'<div class="empty" style="padding:20px;"><div class="empty-icon" style="font-size:30px;">📭</div><p>No visits</p></div>':
+      visits.map(v=>`<div class="visit-card" onclick="toggleVisit('${v.id}',this)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+          <span style="font-size:13.5px;font-weight:700;">📅 ${fmtD(v.date)}</span>
+          <span class="badge s${v.status&&v.status[0]}">${v.status||'waiting'}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);">${v.dept}</div>
+        ${v.diag?`<div style="font-size:13px;margin-top:4px;">🩺 <b>Dx:</b> ${v.diag}</div>`:''}
+        ${v.rx&&v.rx.length>0?`<div style="font-size:12px;color:var(--teal);margin-top:3px;">💊 ${v.rx.length} drug(s)</div>`:''}
+        ${v.inv&&v.inv.length>0?`<div style="font-size:12px;color:#9d174d;margin-top:2px;">🔬 ${v.inv.length} investigation(s)</div>`:''}
+        <div id="vx-${v.id}" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          ${v.complaints?`<div style="font-size:13px;margin-bottom:5px;"><b>CC:</b> ${v.complaints}</div>`:''}
+          ${v.exam?`<div style="font-size:13px;margin-bottom:5px;"><b>Exam:</b> ${v.exam}</div>`:''}
+          ${v.rx&&v.rx.length>0?`<div style="font-size:13px;"><b>Rx:</b><ul style="margin-top:3px;padding-left:16px;">${v.rx.map(r=>`<li>${r.drug} — ${r.dose} ${r.freq} × ${r.dur}</li>`).join('')}</ul></div>`:''}
+          ${v.inv&&v.inv.length>0?`<div style="font-size:13px;margin-top:5px;"><b>Investigations:</b><ul style="margin-top:3px;padding-left:16px;">${v.inv.map(i=>`<li>${i}</li>`).join('')}</ul></div>`:''}
+          <div style="margin-top:8px;display:flex;gap:6px;">
+            ${v.rx&&v.rx.length>0?`<button class="btn btn-outline btn-xs" onclick="event.stopPropagation();printRx('${v.id}')">🖨 Print Rx</button>`:''}
+          </div>
+        </div>
+      </div>`).join('')}
+    </div></div>
+  </div>`;
+}
+function toggleVisit(id){const d=document.getElementById('vx-'+id);if(d)d.style.display=d.style.display==='none'?'block':'none';}
+
+// ========================================================
+// PRESCRIPTION
+// ========================================================
+function rPrescription(){
+  const pt=S.selPt;
+  const tv=pt?S.visits.find(v=>v.ptId===pt.id&&v.date===today()):null;
+  const ev=tv||{};
+  const wt=tv&&tv.vitals?tv.vitals.weight:null;
+  const mos=pt?ageInMonths(pt.dob):0;
+  
+  return `
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;">
+  <div>
+  <!-- Patient Selection -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-hd"><div class="card-title">👤 Patient</div></div>
+    <div class="card-body" style="padding:12px 18px;">
+    ${pt?`<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div>
+        <span style="font-size:17px;font-weight:800;">${pt.name}</span>
+        <span style="font-size:12.5px;color:var(--muted);margin-left:8px;">${pt.uhid} · ${calcAge(pt.dob)} · ${pt.sex==='male'?'♂ M':'♀ F'}</span>
+        ${pt.allergy?`<span style="background:#fee2e2;color:#ef4444;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px;">⚠ ${pt.allergy}</span>`:''}
+      </div>
+      <span class="badge ${dc(pt.dept)}">${pt.dept}</span>
+    </div>
+    ${wt?`<div style="font-size:12px;color:var(--muted);margin-top:6px;">Wt: <b>${wt}kg</b> · Ht: ${tv.vitals.height||'?'}cm · Temp: ${tv.vitals.temp||'?'}°C · HR: ${tv.vitals.hr||'?'}/min · SpO₂: ${tv.vitals.spo2||'?'}%</div>`:'<div class="alert alert-warn" style="margin-top:8px;padding:7px 10px;font-size:12px;">⚠ No vitals recorded today — weight required for dose calculation.</div>'}
+    `:`<div class="field"><label>Select Patient</label>
+    <select class="fld" onchange="S.selPt=S.pts.find(p=>p.id===this.value);S.rxDrugs=[];S.selInv={};render('prescription');" style="max-width:400px;">
+      <option value="">-- Select Patient --</option>
+      ${S.pts.map(p=>`<option value="${p.id}">${p.uhid} — ${p.name} (${calcAge(p.dob)})</option>`).join('')}
+    </select></div>`}
+    </div>
+  </div>
+  
+  ${pt?`
+  <!-- Consultation -->
+  <div class="card">
+    <div class="card-hd"><div class="card-title">📝 Consultation</div></div>
+    <div class="card-body">
+      <div style="margin-bottom:14px;">
+        <div class="tab-bar" id="rx-tabs" style="margin-bottom:14px;">
+          <button class="tab-btn active" onclick="rxTab('complaints',this)">Chief Complaints</button>
+          <button class="tab-btn" onclick="rxTab('exam',this)">Examination</button>
+          <button class="tab-btn" onclick="rxTab('diag',this)">Diagnosis</button>
+        </div>
+        <div id="rxt-complaints"><div class="field"><textarea id="rx-cc" class="fld" placeholder="Presenting complaints, duration, severity..." rows="3">${ev.complaints||''}</textarea></div></div>
+        <div id="rxt-exam" style="display:none;"><div class="field"><textarea id="rx-ex" class="fld" placeholder="General examination, systemic examination findings..." rows="3">${ev.exam||''}</textarea></div></div>
+        <div id="rxt-diag" style="display:none;"><div class="field"><textarea id="rx-dg" class="fld" placeholder="Provisional / confirmed diagnosis, ICD code..." rows="2">${ev.diag||''}</textarea></div></div>
+      </div>
+      
+      <!-- PRESCRIPTION DRUGS -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);">℞ Prescription</div>
+        <div id="rxdlist">${rRxList()}</div>
+        <button class="rx-add-btn" onclick="addRxRow()">+ Add Drug / Medicine</button>
+      </div>
+      
+      <!-- INVESTIGATIONS -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--border);">🔬 Investigations</div>
+        <div class="tab-bar" id="inv-tabs" style="margin-bottom:10px;">
+          ${Object.keys(INVESTIGATIONS).map((k,i)=>`<button class="tab-btn ${i===0?'active':''}" onclick="invTab('${k}',this)">${{heme:'Haematology',bio:'Biochemistry',micro:'Microbiology',urine:'Urine',stool:'Stool',radio:'Radiology/Imaging',spl:'Special'}[k]||k}</button>`).join('')}
+        </div>
+        ${Object.entries(INVESTIGATIONS).map(([k,arr],ki)=>`
+        <div id="invt-${k}" style="${ki>0?'display:none;':''}">
+          <div class="inv-grid">
+            ${arr.map(inv=>`<div class="inv-item ${S.selInv[inv]?'sel':''}" onclick="toggleInv('${inv.replace(/'/g,"\\'")}',this)">
+              <input type="checkbox" ${S.selInv[inv]?'checked':''} onchange="toggleInv('${inv.replace(/'/g,"\\'")}',this.parentElement)" onclick="event.stopPropagation()">
+              <span style="font-size:12px;">${inv}</span>
+            </div>`).join('')}
+          </div>
+        </div>`).join('')}
+        <div class="inv-custom">
+          <div class="field"><label>Custom Investigation</label>
+            <div style="display:flex;gap:8px;">
+              <input id="inv-custom" class="fld" placeholder="Type custom investigation name..." style="flex:1;">
+              <button class="btn btn-outline btn-sm" onclick="addCustomInv()">+ Add</button>
+            </div>
+          </div>
+          <div id="custom-inv-list" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+            ${Object.keys(S.selInv).filter(k=>!Object.values(INVESTIGATIONS).flat().includes(k)).map(k=>`<span style="background:#eef2fb;padding:3px 9px;border-radius:20px;font-size:12px;display:flex;align-items:center;gap:5px;">${k}<button onclick="toggleInv('${k.replace(/'/g,"\\'")}',null)" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:13px;">×</button></span>`).join('')}
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--teal);"><b>${Object.keys(S.selInv).filter(k=>S.selInv[k]).length}</b> investigations selected</div>
+      </div>
+      
+      <!-- Instructions & Follow-up -->
+      <div class="fg2">
+        <div class="field"><label>Special Instructions / Advice</label><textarea id="rx-inst" class="fld" placeholder="Diet, activity, precautions..." rows="2">${ev.instructions||''}</textarea></div>
+        <div class="field"><label>Follow-up Date</label><input type="date" id="rx-fu" class="fld" value="${ev.followup||''}"></div>
+      </div>
+      
+      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveConsult()">💾 Save Consultation</button>
+        <button class="btn btn-teal" onclick="savePrintRx()">🖨 Save & Print Rx</button>
+        <button class="btn btn-outline" onclick="S.rxDrugs=[];S.selInv={};render('prescription')">🔄 Reset</button>
+      </div>
+    </div>
+  </div>`:''}
+  </div>
+  
+  <!-- Drug Reference Sidebar -->
+  <div style="position:sticky;top:70px;">
+    <div class="card">
+      <div class="card-hd"><div class="card-title">💊 Drug Ref (Meherban Singh)</div></div>
+      <div class="card-body" style="padding:10px;">
+        ${wt?`<div class="alert alert-success" style="padding:7px 10px;font-size:12px;margin-bottom:8px;">Wt: <b>${wt}kg</b> · <span style="color:var(--muted);">${mos<12?'Using DROPS':''}${mos>=12&&mos<72?'Using SYRUP (ml)':''}${mos>=72?'Using TABLETS':''}</span></div>`:''}
+        <input id="dsearch" class="fld" placeholder="🔍 Search drug..." oninput="renderDrugSide(this.value)" style="margin-bottom:8px;">
+        <div id="dsidelist" style="max-height:380px;overflow-y:auto;">${rDrugSide('')}</div>
+      </div>
+    </div>
+  </div>
+  </div>`;
+}
+
+function rxTab(k,btn){
+  document.querySelectorAll('[id^=rxt-]').forEach(d=>d.style.display='none');
+  document.getElementById('rxt-'+k).style.display='block';
+  document.querySelectorAll('#rx-tabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function invTab(k,btn){
+  document.querySelectorAll('[id^=invt-]').forEach(d=>d.style.display='none');
+  document.getElementById('invt-'+k).style.display='block';
+  document.querySelectorAll('#inv-tabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function toggleInv(name,el){
+  S.selInv[name]=!S.selInv[name];
+  if(!S.selInv[name])delete S.selInv[name];
+  if(el){el.classList.toggle('sel',!!S.selInv[name]);const cb=el.querySelector('input[type=checkbox]');if(cb)cb.checked=!!S.selInv[name];}
+  const cnt=document.querySelector('#custom-inv-list')?.parentElement?.nextElementSibling;
+  if(cnt)cnt.textContent=Object.keys(S.selInv).filter(k=>S.selInv[k]).length+' investigations selected';
+}
+function addCustomInv(){
+  const inp=document.getElementById('inv-custom');
+  const val=inp.value.trim();if(!val)return;
+  S.selInv[val]=true;inp.value='';
+  const list=document.getElementById('custom-inv-list');
+  if(list)list.innerHTML=Object.keys(S.selInv).filter(k=>!Object.values(INVESTIGATIONS).flat().includes(k)).map(k=>`<span style="background:#eef2fb;padding:3px 9px;border-radius:20px;font-size:12px;display:flex;align-items:center;gap:5px;">${k}<button onclick="toggleInv('${k.replace(/'/g,"\\'")}',null)" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:13px;">×</button></span>`).join('');
+}
+
+function rRxList(){
+  if(!S.rxDrugs||S.rxDrugs.length===0)return '<div style="color:var(--muted);font-size:13px;padding:6px 0;">No drugs added yet.</div>';
+  const pt=S.selPt;const wt=pt?(S.visits.find(v=>v.ptId===pt.id&&v.date===today())?.vitals?.weight||null):null;
+  return S.rxDrugs.map((d,i)=>{
+    const dr=DRUGS.find(x=>x.name===d.drug);
+    const res=(dr&&wt&&pt)?calcDose(d.drug,wt,pt.dob):null;
+    const hint=res?formatDoseHint(res,dr):'';
+    return `<div class="rx-drug-row" id="rxrow-${i}">
+      <button class="rx-remove" onclick="remRx(${i})">×</button>
+      <div class="rx-drug-grid">
+        <div class="field"><label style="font-size:11px;">Drug / Medicine</label>
+          <div class="drug-search-wrap">
+            <input id="rxd-${i}" class="fld" value="${d.drug}" placeholder="Drug name" oninput="rxDSearch(${i},this.value)" onchange="S.rxDrugs[${i}].drug=this.value;updateDoseHint(${i})" style="font-weight:600;">
+            <div id="rxdd-${i}" class="drug-dd" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="field"><label style="font-size:11px;">Dose (auto-calculated)</label>
+          <input id="rxdose-${i}" class="fld" value="${d.dose}" onchange="S.rxDrugs[${i}].dose=this.value" placeholder="mg/kg or ml">
+        </div>
+        <div class="field"><label style="font-size:11px;">Frequency</label>
+          <select id="rxfreq-${i}" class="fld" onchange="S.rxDrugs[${i}].freq=this.value">
+            ${['OD','BD','TDS','QID','Q4-6h','Q6h','Q8h','Q12h','HS','PRN','SOS','Single dose','2x/week'].map(f=>`<option ${d.freq===f?'selected':''}>${f}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label style="font-size:11px;">Duration</label>
+          <select id="rxdur-${i}" class="fld" onchange="S.rxDrugs[${i}].dur=this.value">
+            ${['1 day','2 days','3 days','5 days','7 days','10 days','14 days','21 days','28 days','1 month','2 months','3 months','Till review','Continuous'].map(dur=>`<option ${d.dur===dur?'selected':''}>${dur}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label style="font-size:11px;">Instructions</label>
+          <select id="rxinst-${i}" class="fld" onchange="S.rxDrugs[${i}].instr=this.value">
+            ${['After food','Before food','With food','Empty stomach','At bedtime','With milk','With water','As directed'].map(ins=>`<option ${d.instr===ins?'selected':''}>${ins}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      ${hint?`<div class="dose-hint" id="rxhint-${i}">${hint}</div>`:`<div class="dose-hint" id="rxhint-${i}" style="display:${wt?'block':'none'};background:#f9fafb;color:var(--muted);">Enter drug name to see dose recommendation</div>`}
+    </div>`;
+  }).join('');
+}
+
+function addRxRow(drugObj){
+  const nd=drugObj?{drug:drugObj.name,dose:'',freq:drugObj.freq[0]||'TDS',dur:'5 days',instr:'After food'}:{drug:'',dose:'',freq:'TDS',dur:'5 days',instr:'After food'};
+  S.rxDrugs.push(nd);
+  const i=S.rxDrugs.length-1;
+  // if drugObj provided, auto-calculate dose
+  const pt=S.selPt;const wt=pt?(S.visits.find(v=>v.ptId===pt.id&&v.date===today())?.vitals?.weight||null):null;
+  if(drugObj&&wt&&pt){const res=calcDose(drugObj.name,wt,pt.dob);if(res){nd.dose=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');}}
+  document.getElementById('rxdlist').innerHTML=rRxList();
+  setTimeout(()=>{const inp=document.getElementById('rxd-'+i);if(inp){inp.focus();inp.select&&inp.select();}setupEnterNav();},50);
+}
+
+function remRx(i){S.rxDrugs.splice(i,1);document.getElementById('rxdlist').innerHTML=rRxList();setupEnterNav();}
+
+function rxDSearch(i,q){
+  const dd=document.getElementById('rxdd-'+i);if(!q||q.length<2){dd.style.display='none';return;}
+  const filt=DRUGS.filter(d=>d.name.toLowerCase().includes(q.toLowerCase())||d.cat.toLowerCase().includes(q.toLowerCase())).slice(0,12);
+  dd.style.display=filt.length?'block':'none';
+  dd.innerHTML=filt.map(d=>`<div class="drug-opt" onclick="selectDrug(${i},'${d.name.replace(/'/g,"\\'")}')">
+    <div class="drug-opt-nm">${d.name}</div>
+    <div class="drug-opt-ct">${d.cat}</div>
+    <div class="drug-opt-ds">${d.dose_mgkg?d.dose_mgkg+' mg/kg':''} · ${d.freq.join('/')}</div>
+  </div>`).join('');
+}
+
+function selectDrug(i,name){
+  const pt=S.selPt;const wt=pt?(S.visits.find(v=>v.ptId===pt.id&&v.date===today())?.vitals?.weight||null):null;
+  S.rxDrugs[i].drug=name;
+  const inp=document.getElementById('rxd-'+i);if(inp)inp.value=name;
+  const dd=document.getElementById('rxdd-'+i);if(dd)dd.style.display='none';
+  // auto-calculate dose
+  if(wt&&pt){
+    const res=calcDose(name,wt,pt.dob);
+    if(res){
+      const doseVal=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');
+      S.rxDrugs[i].dose=doseVal;
+      const doseInp=document.getElementById('rxdose-'+i);if(doseInp)doseInp.value=doseVal;
+      const hintEl=document.getElementById('rxhint-'+i);
+      const dr=DRUGS.find(x=>x.name===name);
+      if(hintEl&&dr)hintEl.innerHTML=formatDoseHint(res,dr);
+    }
+  }
+  // move focus to dose field
+  setTimeout(()=>{const d=document.getElementById('rxdose-'+i);if(d){d.focus();d.select&&d.select();}},50);
+}
+
+function updateDoseHint(i){
+  const pt=S.selPt;const wt=pt?(S.visits.find(v=>v.ptId===pt.id&&v.date===today())?.vitals?.weight||null):null;
+  if(!wt||!pt)return;
+  const name=S.rxDrugs[i]?.drug;if(!name)return;
+  const res=calcDose(name,wt,pt.dob);
+  const dr=DRUGS.find(x=>x.name===name);
+  const hintEl=document.getElementById('rxhint-'+i);
+  if(hintEl&&res&&dr)hintEl.innerHTML=formatDoseHint(res,dr);
+}
+
+function rDrugSide(q){
+  const filt=q?DRUGS.filter(d=>d.name.toLowerCase().includes(q.toLowerCase())||d.cat.toLowerCase().includes(q.toLowerCase())):DRUGS.slice(0,35);
+  return filt.slice(0,40).map(d=>`<div onclick="addRxRow(DRUGS.find(x=>x.name==='${d.name.replace(/'/g,"\\'")}'))" style="padding:7px 9px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:.15s;" onmouseover="this.style.background='#f0fdfa'" onmouseout="this.style.background=''">
+    <div style="font-size:13px;font-weight:600;color:var(--navy);">${d.name}</div>
+    <div style="font-size:10.5px;color:var(--muted);">${d.cat}</div>
+    <div style="font-size:11.5px;color:var(--teal);">${d.dose_mgkg?d.dose_mgkg+' mg/kg':'Topical/Fixed dose'} · ${d.freq[0]}</div>
+  </div>`).join('');
+}
+function renderDrugSide(q){const el=document.getElementById('dsidelist');if(el)el.innerHTML=rDrugSide(q);}
+
+function saveConsult(){
+  const pt=S.selPt;if(!pt){toast('Select a patient first','error');return;}
+  let tv=S.visits.find(v=>v.ptId===pt.id&&v.date===today());
+  if(!tv){tv={id:uid(),ptId:pt.id,date:today(),dept:pt.dept,status:'inprogress',vitals:{},anthro:{},complaints:'',exam:'',diag:'',rx:[],inv:[],instructions:'',followup:'',docId:'',docName:'',createdAt:new Date().toISOString()};S.visits.push(tv);}
+  tv.complaints=document.getElementById('rx-cc')?.value||'';
+  tv.exam=document.getElementById('rx-ex')?.value||'';
+  tv.diag=document.getElementById('rx-dg')?.value||'';
+  tv.rx=S.rxDrugs.map(d=>({...d}));
+  tv.inv=Object.keys(S.selInv).filter(k=>S.selInv[k]);
+  tv.instructions=document.getElementById('rx-inst')?.value||'';
+  tv.followup=document.getElementById('rx-fu')?.value||'';
+  tv.docId=S.user.id;tv.docName=S.user.name;tv.status='done';
+  save();toast('Consultation saved!');
+}
+
+function savePrintRx(){saveConsult();const pt=S.selPt;if(!pt)return;const tv=S.visits.find(v=>v.ptId===pt.id&&v.date===today());if(tv)printRx(tv.id);}
+
+// ========================================================
+// DRUG DB
+// ========================================================
+function rDrugDB(){
+  return `<div class="card"><div class="card-hd"><div class="card-title">📚 Drug Guidelines — Meherban Singh (${DRUGS.length} drugs)</div></div><div class="card-body">
+  <div class="sbar"><input id="ddbsearch" class="fld" placeholder="🔍 Search drug or category..." oninput="render('drugdb')"></div>
+  <div style="overflow-x:auto;"><table class="pt-table"><thead><tr><th>#</th><th>Drug</th><th>Category</th><th>Dose (mg/kg/day)</th><th>Max</th><th>Frequency</th><th>Formulations</th><th>Notes</th></tr></thead><tbody>
+  ${(()=>{const q=(document.getElementById('ddbsearch')||{value:''}).value?.toLowerCase()||'';const filt=DRUGS.filter(d=>!q||d.name.toLowerCase().includes(q)||d.cat.toLowerCase().includes(q));return filt.map((d,i)=>`<tr>
+    <td style="color:var(--muted);font-size:11.5px;">${i+1}</td>
+    <td style="font-weight:700;color:var(--navy);white-space:nowrap;">${d.name}</td>
+    <td><span style="font-size:11px;background:#eef2fb;padding:2px 7px;border-radius:20px;white-space:nowrap;">${d.cat}</span></td>
+    <td style="font-size:13px;font-weight:600;color:var(--teal);">${d.dose_mgkg?d.dose_mgkg+' mg/kg':'Fixed / Topical'}</td>
+    <td style="font-size:12px;">${d.max_mg?d.max_mg+'mg':'-'}</td>
+    <td style="font-size:12px;white-space:nowrap;">${d.freq.join(', ')}</td>
+    <td style="font-size:11.5px;color:var(--muted);max-width:150px;">${d.forms?Object.values(d.forms).filter(Boolean).join(' | '):'-'}</td>
+    <td style="font-size:11.5px;color:var(--muted);max-width:200px;">${d.note||'-'}</td>
+  </tr>`).join('');})()}
+  </tbody></table></div></div></div>`;
+}
+
+// ========================================================
+// PRINT PRESCRIPTION
+// ========================================================
+function printRx(visitId){
+  const v=S.visits.find(x=>x.id===visitId);if(!v)return;
+  const pt=S.pts.find(p=>p.id===v.ptId);if(!pt)return;
+  const doc=USERS.find(u=>u.id===v.docId)||S.user;
+  const vit=v.vitals||{};const ant=v.anthro||{};const mos=ageInMonths(pt.dob);
+  const invList=v.inv||[];
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Prescription</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Outfit',sans-serif;background:#fff;}
+.sheet{max-width:210mm;margin:0 auto;padding:18mm 16mm 14mm;min-height:297mm;}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px double #1a2744;padding-bottom:12px;margin-bottom:14px;}
+.phn{font-size:21px;font-weight:800;color:#1a2744;}
+.phs{font-size:11px;color:#6b7a9d;margin-top:3px;}
+.pc{font-size:11px;color:#6b7a9d;text-align:right;}
+.ppts{background:#f8f9fd;border-radius:9px;padding:10px 14px;margin-bottom:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.ppt-i{font-size:11.5px;}.ppt-i span{font-weight:700;display:block;font-size:13.5px;color:#1a2744;}
+.pvits{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:12px;}
+.pvit{background:#f8f9fd;border-radius:7px;padding:6px 9px;font-size:11px;color:#6b7a9d;}
+.pvit span{display:block;font-weight:700;font-size:13px;color:#1a2744;}
+.pdb{border:1.5px solid #dde3f0;border-radius:8px;padding:9px 13px;margin-bottom:12px;}
+.pdbt{font-size:10px;font-weight:700;color:#6b7a9d;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.prx{font-size:26px;color:#1a2744;font-family:'Lora',serif;font-weight:400;margin-bottom:9px;}
+.prxt{width:100%;border-collapse:collapse;margin-bottom:14px;}
+.prxt th{font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7a9d;padding:6px 9px;background:#f8f9fd;border-bottom:2px solid #dde3f0;}
+.prxt td{padding:8px 9px;border-bottom:1px solid #f0f4f8;font-size:13px;vertical-align:top;}
+.prxt tr:last-child td{border-bottom:none;}
+.pinvt{width:100%;border-collapse:collapse;margin-bottom:14px;}
+.pinvt th{font-size:10px;font-weight:700;text-transform:uppercase;color:#9d174d;padding:6px 9px;background:#fdf2f8;border-bottom:2px solid #fce7f3;}
+.pinvt td{padding:7px 9px;border-bottom:1px solid #fce7f3;font-size:13px;}
+.pantro{background:#f0fdf4;border:1px solid #a7f3d0;border-radius:7px;padding:7px 12px;margin-bottom:12px;font-size:11.5px;}
+.pantro span{font-weight:700;color:#065f46;}
+.pft{margin-top:16px;padding-top:10px;border-top:1px solid #dde3f0;display:flex;justify-content:space-between;align-items:flex-end;}
+.psig{text-align:right;}
+.psig-nm{font-size:15px;font-weight:700;color:#1a2744;}
+.psig-ql{font-size:10.5px;color:#6b7a9d;margin-top:1px;}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{margin:0;size:A4;}}
+</style></head><body><div class="sheet">
+<div class="ph">
+  <div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="font-size:36px;color:#00b8a9;line-height:1;">✚</div>
+      <div><div class="phn">Chandrawati Hospital</div>
+      <div class="phs">GT Road, Barwadda, Dhanbad · Jharkhand 826001</div>
+      <div class="phs">Pediatrics · OBG & Gynecology · General Medicine · Orthopedics</div></div>
+    </div>
+  </div>
+  <div class="pc">Date: ${fmtD(v.date)}<br>UHID: ${pt.uhid}</div>
+</div>
+
+<div class="ppts">
+  <div class="ppt-i">Patient<span>${pt.name}</span></div>
+  <div class="ppt-i">Age / Sex<span>${calcAge(pt.dob)} / ${pt.sex==='male'?'M':'F'}</span></div>
+  <div class="ppt-i">Guardian<span>${pt.guardian||'-'}</span></div>
+  <div class="ppt-i">Phone<span>${pt.phone||'-'}</span></div>
+</div>
+
+${(vit.temp||vit.hr||vit.weight)?`<div class="pvits">
+  ${vit.temp?`<div class="pvit">Temp<span>${vit.temp}°C</span></div>`:''}
+  ${vit.hr?`<div class="pvit">HR<span>${vit.hr}/min</span></div>`:''}
+  ${vit.rr?`<div class="pvit">RR<span>${vit.rr}/min</span></div>`:''}
+  ${vit.spo2?`<div class="pvit">SpO₂<span>${vit.spo2}%</span></div>`:''}
+  ${vit.weight?`<div class="pvit">Weight<span>${vit.weight}kg</span></div>`:''}
+  ${vit.height?`<div class="pvit">Height<span>${vit.height}cm</span></div>`:''}
+</div>`:''}
+
+${(ant.waz!==null&&ant.waz!==undefined)?`<div class="pantro">${ant.waz!==null?`WAZ: <span>${ant.waz}</span>`:''}${ant.haz!==null?` · HAZ: <span>${ant.haz}</span>`:''}${ant.whz!==null&&mos<60?` · WHZ: <span>${ant.whz}</span>`:''}${ant.bmi?` · BMI: <span>${ant.bmi}</span>`:''}${ant.muac?` · MUAC: <span>${ant.muac}cm</span>`:''}</div>`:''}
+
+${v.complaints?`<div class="pdb"><div class="pdbt">Chief Complaints</div>${v.complaints}</div>`:''}
+${v.diag?`<div class="pdb"><div class="pdbt">Diagnosis / Clinical Impression</div><b>${v.diag}</b></div>`:''}
+
+${v.rx&&v.rx.length>0?`<div class="prx">Rx</div>
+<table class="prxt"><thead><tr><th>#</th><th>Drug / Medicine</th><th>Dose</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead><tbody>
+${v.rx.map((r,i)=>`<tr><td style="color:#6b7a9d;font-size:11.5px;">${i+1}</td><td style="font-weight:700;font-size:14px;">${r.drug}</td><td>${r.dose||'-'}</td><td>${r.freq||'-'}</td><td>${r.dur||'-'}</td><td style="color:#6b7a9d;font-size:12px;">${r.instr||'-'}</td></tr>`).join('')}
+</tbody></table>`:''}
+
+${invList.length>0?`<div class="prx" style="font-size:20px;font-family:'Outfit',sans-serif;font-weight:700;color:#9d174d;margin-bottom:8px;">🔬 Investigations Ordered</div>
+<table class="pinvt"><thead><tr><th>#</th><th>Investigation</th><th>Sample / Remarks</th></tr></thead><tbody>
+${invList.map((inv,i)=>`<tr><td style="color:#9d174d;font-size:11.5px;">${i+1}</td><td>${inv}</td><td style="color:#6b7a9d;font-size:12px;"></td></tr>`).join('')}
+</tbody></table>`:''}
+
+${v.instructions?`<div class="pdb"><div class="pdbt">Instructions / Advice</div>${v.instructions}</div>`:''}
+${v.followup?`<div style="font-size:13.5px;margin-bottom:10px;"><b>Follow-up:</b> ${fmtD(v.followup)}</div>`:''}
+
+<div class="pft">
+  <div style="font-size:12px;color:#6b7a9d;">⚠ Prescription valid 7 days · Bring this prescription on next visit</div>
+  <div class="psig">
+    <div style="min-height:38px;border-bottom:1px solid #1a2744;min-width:150px;margin-bottom:5px;"></div>
+    <div class="psig-nm">${doc.name}</div>
+    <div class="psig-ql">${doc.qual||''}</div>
+    <div class="psig-ql">${doc.dept} · Chandrawati Hospital</div>
+  </div>
+</div>
+<div style="text-align:center;margin-top:10px;font-size:9.5px;color:#c8cfe0;">Chandrawati Hospital OPD System · Confidential</div>
+</div><script>window.onload=()=>window.print();<\/script></body></html>`;
+  const w=window.open('','_blank','width=900,height=700');
+  if(w){w.document.write(html);w.document.close();}else toast('Allow popups to print','error');
+}
+
+// ========================================================
+// MODAL
+// ========================================================
+function showModal(h){document.getElementById('modal-container').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box">${h}</div></div>`;}
+function closeModal(){document.getElementById('modal-container').innerHTML='';}
+
+// ========================================================
+// INIT
+// ========================================================
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('tdate').textContent=new Date().toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('lu').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lp').focus();});
+  document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+});
+
+// Close drug dropdowns on outside click
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.drug-search-wrap'))document.querySelectorAll('.drug-dd').forEach(d=>d.style.display='none');
+});
+</script>
+</body>
+</html>
