@@ -546,10 +546,14 @@ async function startup(){
   }
   showLoad('Verifying database connection...');
   try{
-    // Hard timeout — if Firebase doesn't respond in 10s, block the app
+    // C1 FIX: .once('value') on .info/connected resolves immediately with false
+    // when offline. Must wait for it to become true, with hard timeout.
     await Promise.race([
-      DB.ref('.info/connected').once('value'),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Connection timeout (10s)')),10000))
+      new Promise((res,rej)=>{
+        const ref=DB.ref('.info/connected');
+        ref.on('value',snap=>{if(snap.val()===true){ref.off('value');res();}});
+      }),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Connection timeout — Firebase unreachable after 10 seconds')),10000))
     ]);
     const done=await checkSetupDone();
     hideLoad();
@@ -631,16 +635,29 @@ async function dbPush(path,val){
   });
 }
 async function dbRemove(path){
-  return new Promise((res,rej)=>{DB.ref('chwh_opd/'+path).remove(err=>err?rej(err):res());});
+  return new Promise((res,rej)=>{
+    if(!DB){rej(new Error('No DB'));return;}
+    DB.ref('chwh_opd/'+path).remove(err=>err?rej(err):res());
+  });
 }
 async function dbGet(path){
-  return new Promise((res,rej)=>{DB.ref('chwh_opd/'+path).once('value',snap=>res(snap.val()),rej);});
+  return new Promise((res,rej)=>{
+    if(!DB){rej(new Error('No DB'));return;}
+    DB.ref('chwh_opd/'+path).once('value',snap=>res(snap.val()),rej);
+  });
 }
 async function genUHID(){
-  const n=await dbGet('config/lastUHID')||0;
-  const newN=n+1;
-  await dbSet('config/lastUHID',newN);
-  return 'CHWH-'+new Date().getFullYear()+'-'+String(newN).padStart(4,'0');
+  // M1 FIX: use Firebase transaction to prevent duplicate UHIDs on concurrent registration
+  return new Promise((res,rej)=>{
+    if(!DB){rej(new Error('No DB'));return;}
+    DB.ref('chwh_opd/config/lastUHID').transaction(current=>{
+      return (current||0)+1;
+    },(err,committed,snap)=>{
+      if(err||!committed){rej(err||new Error('UHID transaction failed'));return;}
+      const n=snap.val();
+      res('CHWH-'+new Date().getFullYear()+'-'+String(n).padStart(4,'0'));
+    });
+  });
 }
 
 // ================================================================
@@ -708,7 +725,7 @@ async function testFirebase(){
 
 async function finishSetup(){
   const name=document.getElementById('adm-name').value.trim();
-  const user=document.getElementById('adm-user').value.trim();
+  const user=document.getElementById('adm-user').value.trim().replace(/\s/g,'').toLowerCase();
   const pass=document.getElementById('adm-pass').value;
   const pass2=document.getElementById('adm-pass2').value;
   const errEl=document.getElementById('setup-err');
@@ -772,6 +789,12 @@ async function doLogin(){
 
 function doLogout(){
   if(!confirm('Sign out?'))return;
+  // M3 FIX: detach all Firebase .on() listeners to prevent accumulation on re-login
+  if(DB){
+    DB.ref('chwh_opd/patients').off();
+    DB.ref('chwh_opd/visits').off();
+    DB.ref('.info/connected').off();
+  }
   S.user=null;S.view='dash';S.selPt=null;S.rxDrugs=[];S.selInv={};
   document.getElementById('lu').value='';document.getElementById('lp').value='';
   document.getElementById('lerr').style.display='none';
@@ -832,12 +855,12 @@ function buildBottomNav(){
   document.getElementById('bnav').innerHTML=items.map(it=>`<button class="bn-item ${S.view===it.v?'active':''}" onclick="nav('${it.v}')"><span class="bn-icon">${it.i}</span><span class="bn-lbl">${it.l}</span></button>`).join('');
 }
 
-function nav(v,data){
+async function nav(v,data){
   S.view=v;if(data)S.selPt=data;
   buildSidebar();buildBottomNav();
   const T={dash:'Dashboard',register:'Register Patient',patients:'Patient Records',vitals:'Record Vitals',queue:"Today's OPD",prescription:'Write Prescription',drugdb:'Drug Guidelines',ptdetail:'Patient Record',adminusers:'User Management',adminlogs:'System Statistics',adminadduser:'Add New User',admineditur:'Edit User'};
   document.getElementById('ttitle').textContent=T[v]||'OPD System';
-  render(v);
+  await render(v); // C3 FIX: await async render
 }
 async function render(v){
   const a=document.getElementById('carea');
@@ -1370,17 +1393,19 @@ async function saveConsult(){
   showLoad('Saving consultation...');
   try{
     let tv=visArr().find(v=>v.ptId===pt.id&&v.date===today());
-    if(!tv){const vid=uid();tv={id:vid,ptId:pt.id,date:today(),dept:pt.dept,status:'inprogress',vitals:{},anthro:{},complaints:'',exam:'',diag:'',rx:[],inv:[],instructions:'',followup:'',docId:'',docName:'',createdAt:new Date().toISOString()};await dbSet('visits/'+vid,tv);}
+    let vid;
+    if(!tv){vid=uid();tv={id:vid,ptId:pt.id,date:today(),dept:pt.dept,status:'inprogress',vitals:{},anthro:{},complaints:'',exam:'',diag:'',rx:[],inv:[],instructions:'',followup:'',docId:'',docName:'',createdAt:new Date().toISOString()};await dbSet('visits/'+vid,tv);}
+    else{vid=tv.id;}
     const upd={complaints:document.getElementById('rx-cc')?.value||'',exam:document.getElementById('rx-ex')?.value||'',diag:document.getElementById('rx-dg')?.value||'',rx:S.rxDrugs.map(d=>({...d})),inv:Object.keys(S.selInv).filter(k=>S.selInv[k]),instructions:document.getElementById('rx-inst')?.value||'',followup:document.getElementById('rx-fu')?.value||'',docId:S.user.id,docName:S.user.name,status:'done'};
-    await dbUpdate('visits/'+tv.id,upd);
+    await dbUpdate('visits/'+vid,upd);
     hideLoad();toast('Consultation saved to cloud!');
-  }catch(e){hideLoad();toast('Error: '+e.message,'error');}
+    return vid; // C2 FIX: return visitId directly
+  }catch(e){hideLoad();toast('Error: '+e.message,'error');return null;}
 }
 async function savePrintRx(){
-  await saveConsult();
-  const pt=S.selPt;if(!pt)return;
-  const tv=visArr().find(v=>v.ptId===pt.id&&v.date===today());
-  if(tv)printRx(tv.id);
+  // C2 FIX: use returned visitId directly, don't read stale S.visits
+  const vid=await saveConsult();
+  if(vid)printRx(vid);
 }
 
 // ================================================================
@@ -1608,7 +1633,7 @@ function rAdminAddUser(){
       <div class="field" id="dept-field"><label class="req">Department</label>
         <select id="nu-dept" class="fld">
           <option>Pediatrics</option>
-          <option>OBG &amp; Gynecology</option>
+          <option>OBG & Gynecology</option>
           <option>General Medicine</option>
           <option>Orthopedics</option>
         </select>
@@ -1714,10 +1739,17 @@ function rAdminLogs(){
 // ================================================================
 // PRINT PRESCRIPTION
 // ================================================================
-function printRx(visitId){
+// PRINT PRESCRIPTION
+// ================================================================
+async function printRx(visitId){
   const v=visArr().find(x=>x.id===visitId);if(!v)return;
   const pt=ptsArr().find(p=>p.id===v.ptId);if(!pt)return;
-  const doc=Object.values(window._adminUsers||{}).find(u=>u.id===v.docId)||S.user;
+  // H3 FIX: fetch doctor from Firebase directly using stored docId
+  let doc=S.user;
+  if(v.docId){
+    try{const fetched=await dbGet('users/'+v.docId);if(fetched)doc=fetched;}
+    catch(e){/* fallback to S.user */}
+  }
   const vit=v.vitals||{};const ant=v.anthro||{};const mos=ageInMonths(pt.dob);
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Prescription — ${pt.name}</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
@@ -1780,8 +1812,15 @@ ${v.followup?`<div style="font-size:13.5px;margin-bottom:9px;"><b>Follow-up:</b>
 // ================================================================
 // MODAL
 // ================================================================
-function showModal(h){document.getElementById('modal-container').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box">${h}</div></div>`;}
+function showModal(h){
+  document.getElementById('modal-container').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box">${h}</div></div>`;
+}
 function closeModal(){document.getElementById('modal-container').innerHTML='';}
+
+// M2 FIX: ESC key closes modals
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&document.getElementById('modal-container')?.innerHTML)closeModal();
+});
 
 // ================================================================
 // CLOSE DROPDOWNS ON OUTSIDE CLICK
