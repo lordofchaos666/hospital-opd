@@ -786,6 +786,15 @@ function initApp(){
   document.getElementById('uav').textContent=u.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
   document.getElementById('unm').textContent=u.name;
   document.getElementById('url').textContent=u.role==='admin'?'Administrator':u.role==='doctor'?u.dept:'Nursing Staff';
+  // Show username + ID below role
+  let idEl=document.getElementById('u-id-line');
+  if(!idEl){
+    idEl=document.createElement('div');
+    idEl.id='u-id-line';
+    idEl.style.cssText='font-size:10px;color:rgba(255,255,255,.35);margin-top:1px;font-family:monospace;letter-spacing:.3px;';
+    document.getElementById('url').parentNode.appendChild(idEl);
+  }
+  idEl.textContent='@'+u.username+' · '+u.id;
   document.getElementById('tdate').textContent=new Date().toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
   buildSidebar();buildBottomNav();nav('dash');
 }
@@ -830,7 +839,7 @@ function nav(v,data){
   document.getElementById('ttitle').textContent=T[v]||'OPD System';
   render(v);
 }
-function render(v){
+async function render(v){
   const a=document.getElementById('carea');
   if(v==='dash')a.innerHTML=rDash();
   else if(v==='register')a.innerHTML=rRegister();
@@ -840,10 +849,10 @@ function render(v){
   else if(v==='prescription')a.innerHTML=rPrescription();
   else if(v==='drugdb')a.innerHTML=rDrugDB();
   else if(v==='ptdetail')a.innerHTML=rPtDetail();
-  else if(v==='adminusers')a.innerHTML=rAdminUsers();
+  else if(v==='adminusers')await renderAdminUsers();
   else if(v==='adminlogs')a.innerHTML=rAdminLogs();
   else if(v==='adminadduser')a.innerHTML=rAdminAddUser();
-  else if(v==='admineditur')a.innerHTML=rAdminEditUser();
+  else if(v==='admineditur')await renderAdminEditUser();
   setupEnterNav();
 }
 
@@ -1396,160 +1405,280 @@ function rDrugDB(){
 }
 
 // ================================================================
-// ADMIN — USER MANAGEMENT
+// ADMIN — USER MANAGEMENT (all async, no Promise-as-string bugs)
 // ================================================================
-function rAdminUsers(){
-  return (async()=>'')().then(()=>{
-    const usersData=window._adminUsers||{};
-    if(!window._adminUsersLoaded){
-      dbGet('users').then(d=>{window._adminUsers=d||{};window._adminUsersLoaded=true;render('adminusers');});
-      return `<div class="alert alert-info">Loading users from Firebase...</div>`;
-    }
-    const users=Object.values(usersData).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-    window._adminUsersLoaded=false;
-    return `
-    <div class="admin-banner"><span style="font-size:28px;">👥</span><div>
-      <div style="font-size:16px;font-weight:700;">User Management</div>
-      <div style="font-size:13px;opacity:.8;">Add, edit, activate/deactivate, or permanently delete accounts</div>
-    </div><button class="btn btn-teal btn-sm" style="margin-left:auto;" onclick="nav('adminadduser')">➕ Add New User</button></div>
-    <div class="card">
-      <div class="card-hd"><div class="card-title">All Users (${users.length})</div><button class="btn btn-outline btn-sm" onclick="reloadUsers()">🔄 Refresh</button></div>
-      ${users.length===0?'<div class="card-body" style="text-align:center;padding:36px;color:var(--muted);">No users found</div>':
-      users.map(u=>`<div class="user-row">
-        <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
-          <div class="user-av" style="background:${u.role==='admin'?'#6d28d9':u.role==='doctor'?'#1d4ed8':'#be185d'};flex-shrink:0;">${(u.name||'?')[0].toUpperCase()}</div>
-          <div style="min-width:0;">
-            <div style="font-size:14px;font-weight:700;">${u.name}</div>
-            <div style="font-size:12px;color:var(--muted);">@${u.username} · ${u.dept||''} · ${u.qual||''}</div>
-            ${u.lastLogin?`<div style="font-size:11px;color:var(--muted);">Last login: ${fmtD(u.lastLogin.split('T')[0])}</div>`:
-            `<div style="font-size:11px;color:var(--muted);">Never logged in</div>`}
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0;">
-          <span class="role-badge rb-${u.role}">${u.role}</span>
-          <span style="font-size:11px;padding:2px 7px;border-radius:20px;font-weight:600;${u.active!==false?'background:#d1fae5;color:#065f46;':'background:#fee2e2;color:#991b1b;'}">${u.active!==false?'● Active':'○ Inactive'}</span>
-          <button class="btn btn-outline btn-xs" onclick="editUser('${u.id}')">✏️ Edit</button>
-          ${u.id!==S.user.id?`
-          <button class="btn btn-xs" style="background:${u.active!==false?'#fef3c7':'#d1fae5'};color:${u.active!==false?'#92400e':'#065f46'};border:1px solid ${u.active!==false?'#fde68a':'#6ee7b7'};cursor:pointer;border-radius:6px;padding:4px 9px;font-size:11.5px;font-weight:600;" onclick="toggleUser('${u.id}',${u.active!==false})">${u.active!==false?'⏸ Deactivate':'▶ Activate'}</button>
-          <button class="btn btn-xs" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;cursor:pointer;border-radius:6px;padding:4px 9px;font-size:11.5px;font-weight:600;" onclick="deleteUser('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.username}')">🗑 Delete</button>
-          `:'<span style="font-size:11px;background:#eef2fb;padding:3px 7px;border-radius:20px;color:var(--muted);">You</span>'}
-        </div>
-      </div>`).join('')}
-    </div>`;
-  });
-}
-
-function reloadUsers(){window._adminUsersLoaded=false;window._adminUsers={};render('adminusers');}
-function editUser(id){window._editUserId=id;nav('admineditur');}
-
-async function toggleUser(id,currentActive){
-  if(!confirm(`${currentActive?'Deactivate':'Activate'} this user?`))return;
-  showLoad('Updating...');
-  try{await dbUpdate('users/'+id,{active:!currentActive});hideLoad();toast(currentActive?'User deactivated':'User activated');reloadUsers();}
-  catch(e){hideLoad();toast('Error: '+e.message,'error');}
-}
-
-async function deleteUser(id,name,username){
-  // Double confirmation for destructive action
-  if(!confirm(`⚠️ DELETE USER?\n\nName: ${name}\nUsername: @${username}\n\nThis is permanent and cannot be undone. Proceed?`))return;
-  if(!confirm(`Confirm: permanently delete @${username}?`))return;
-  showLoad('Deleting user...');
+async function renderAdminUsers(){
+  const a=document.getElementById('carea');
+  a.innerHTML=`<div class="alert alert-info" style="padding:14px 18px;"><span style="font-size:16px;">⏳</span> Loading users from Firebase...</div>`;
   try{
-    await dbRemove('users/'+id);
-    hideLoad();toast(`User @${username} deleted permanently`);reloadUsers();
+    const data=await dbGet('users')||{};
+    const users=Object.values(data).sort((a,b)=>{
+      const ro={admin:0,doctor:1,nurse:2};
+      return (ro[a.role]||9)-(ro[b.role]||9)||(a.name||'').localeCompare(b.name||'');
+    });
+    const roleColor={admin:'#6d28d9',doctor:'#1d4ed8',nurse:'#be185d'};
+    const roleBg={admin:'#ede9fe',doctor:'#dbeafe',nurse:'#fce7f3'};
+    const roleText={admin:'#6d28d9',doctor:'#1d4ed8',nurse:'#be185d'};
+    a.innerHTML=`
+    <div class="admin-banner" style="margin-bottom:16px;">
+      <span style="font-size:28px;">👥</span>
+      <div>
+        <div style="font-size:16px;font-weight:700;">User Management</div>
+        <div style="font-size:13px;opacity:.8;">${users.length} accounts · Add, edit, change password, or delete</div>
+      </div>
+      <button class="btn btn-teal btn-sm" style="margin-left:auto;" onclick="nav('adminadduser')">➕ Add New User</button>
+    </div>
+
+    ${users.length===0?`<div class="card"><div class="card-body" style="text-align:center;padding:40px;color:var(--muted);">No users found. Add one above.</div></div>`:`
+    <div class="card">
+      <div class="card-hd">
+        <div class="card-title">All Accounts (${users.length})</div>
+        <button class="btn btn-outline btn-sm" onclick="render('adminusers')">🔄 Refresh</button>
+      </div>
+      ${users.map(u=>{
+        const av=(u.name||'?')[0].toUpperCase();
+        const isYou=u.id===S.user.id;
+        const isActive=u.active!==false;
+        return `<div class="user-row" style="padding:14px 18px;gap:12px;flex-wrap:wrap;">
+          <!-- Avatar + Info -->
+          <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:200px;">
+            <div style="width:42px;height:42px;border-radius:50%;background:${roleColor[u.role]||'#374151'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff;flex-shrink:0;">${av}</div>
+            <div>
+              <div style="font-size:14px;font-weight:800;color:var(--navy);">${u.name}${isYou?` <span style="font-size:10px;background:#eef2fb;color:var(--muted);padding:1px 6px;border-radius:10px;font-weight:600;">YOU</span>`:''}</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
+                <span style="font-size:12px;font-family:'DM Mono',monospace;background:#f1f5f9;color:#374151;padding:1px 7px;border-radius:5px;font-weight:600;">@${u.username}</span>
+                <span style="font-size:11.5px;background:${roleBg[u.role]||'#f3f4f6'};color:${roleText[u.role]||'#374151'};padding:2px 8px;border-radius:20px;font-weight:700;">${u.role.toUpperCase()}</span>
+                <span style="font-size:11px;padding:2px 7px;border-radius:20px;font-weight:600;background:${isActive?'#d1fae5':'#fee2e2'};color:${isActive?'#065f46':'#991b1b'};">${isActive?'● Active':'○ Inactive'}</span>
+              </div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:3px;">${u.dept||''}${u.qual?' · '+u.qual:''}</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:1px;">${u.lastLogin?'Last login: '+fmtD(u.lastLogin.split('T')[0]):'Never logged in'} · Created: ${fmtD((u.createdAt||'').split('T')[0])}</div>
+            </div>
+          </div>
+          <!-- Actions -->
+          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-xs" onclick="adminEditUser('${u.id}')">✏️ Edit</button>
+            ${!isYou?`
+            <button class="btn btn-xs" style="background:${isActive?'#fef3c7':'#d1fae5'};color:${isActive?'#92400e':'#065f46'};border:1px solid ${isActive?'#fde68a':'#a7f3d0'};border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;" onclick="toggleUserActive('${u.id}',${isActive},'${u.name.replace(/'/g,"\\'")}')">
+              ${isActive?'⏸ Deactivate':'▶ Activate'}
+            </button>
+            <button class="btn btn-xs" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;" onclick="adminDeleteUser('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.username}')">
+              🗑 Delete
+            </button>`:''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`}`;
+    setupEnterNav();
+  }catch(e){
+    a.innerHTML=`<div class="alert alert-danger">Failed to load users: ${e.message} <button class="btn btn-outline btn-xs" onclick="render('adminusers')" style="margin-left:8px;">Retry</button></div>`;
+  }
+}
+
+function reloadUsers(){render('adminusers');}
+
+function adminEditUser(id){
+  window._editUserId=id;
+  nav('admineditur');
+}
+
+async function toggleUserActive(id,currentActive,name){
+  if(!confirm(`${currentActive?'Deactivate':'Activate'} account for ${name}?`))return;
+  showLoad('Updating...');
+  try{
+    await dbUpdate('users/'+id,{active:!currentActive});
+    hideLoad();toast(currentActive?`${name} deactivated`:`${name} activated`);
+    render('adminusers');
   }catch(e){hideLoad();toast('Error: '+e.message,'error');}
 }
 
-function rAdminAddUser(){
-  return `<div class="card"><div class="card-hd"><div class="card-title">➕ Add New User</div><button class="btn btn-outline btn-sm" onclick="nav('adminusers')">← Back</button></div><div class="card-body">
-  <div class="fg">
-    <div class="field"><label class="req">Full Name</label><input id="nu-name" class="fld" placeholder="Dr. / Nurse name"></div>
-    <div class="field"><label class="req">Username</label><input id="nu-user" class="fld" placeholder="username (no spaces)"></div>
-    <div class="field"><label class="req">Role</label><select id="nu-role" class="fld" onchange="toggleDeptField()"><option value="doctor">Doctor</option><option value="nurse">Nurse</option><option value="admin">Admin</option></select></div>
-    <div class="field" id="dept-field"><label class="req">Department</label><select id="nu-dept" class="fld"><option>Pediatrics</option><option>OBG & Gynecology</option><option>General Medicine</option><option>Orthopedics</option></select></div>
-    <div class="field"><label>Qualification</label><input id="nu-qual" class="fld" placeholder="MD, MS, GNM..."></div>
-    <div class="field"></div>
-    <div class="field"><label class="req">Password</label><input id="nu-pass" type="password" class="fld" placeholder="Min 8 characters"></div>
-    <div class="field"><label class="req">Confirm Password</label><input id="nu-pass2" type="password" class="fld" placeholder="Repeat password"></div>
-  </div>
-  <div id="nu-err" class="alert alert-danger" style="display:none;margin-top:10px;"></div>
-  <div style="margin-top:14px;display:flex;gap:10px;">
-    <button class="btn btn-primary" onclick="addUser()">✅ Create User</button>
-    <button class="btn btn-outline" onclick="nav('adminusers')">Cancel</button>
-  </div></div></div>`;
-}
-function toggleDeptField(){const r=document.getElementById('nu-role').value;const d=document.getElementById('dept-field');if(d)d.style.display=r==='admin'?'none':'flex';}
-
-async function addUser(){
-  const name=document.getElementById('nu-name').value.trim();
-  const uname=document.getElementById('nu-user').value.trim().replace(/\s/g,'');
-  const role=document.getElementById('nu-role').value;
-  const dept=role==='admin'?'Administration':(document.getElementById('nu-dept')?.value||'');
-  const qual=document.getElementById('nu-qual').value.trim();
-  const pass=document.getElementById('nu-pass').value;
-  const pass2=document.getElementById('nu-pass2').value;
-  const errEl=document.getElementById('nu-err');errEl.style.display='none';
-  if(!name||!uname||!pass){errEl.textContent='Fill all required fields.';errEl.style.display='block';return;}
-  if(pass.length<8){errEl.textContent='Password must be at least 8 characters.';errEl.style.display='block';return;}
-  if(pass!==pass2){errEl.textContent='Passwords do not match.';errEl.style.display='block';return;}
-  showLoad('Creating user...');
+async function adminDeleteUser(id,name,username){
+  if(!confirm(`⚠️ PERMANENTLY DELETE ACCOUNT?\n\nName: ${name}\nUsername: @${username}\n\nThis cannot be undone. The user will immediately lose access.`))return;
+  if(!confirm(`Final confirmation: delete @${username}?`))return;
+  showLoad('Deleting...');
   try{
-    const existing=await dbGet('users')||{};
-    if(Object.values(existing).some(u=>u.username===uname)){hideLoad();errEl.textContent='Username already exists.';errEl.style.display='block';return;}
-    const ph=await hashPass(pass);
-    const id='usr_'+uid();
-    await dbSet('users/'+id,{id,username:uname,name,role,dept,qual,passHash:ph,active:true,createdAt:new Date().toISOString(),createdBy:S.user.name});
-    hideLoad();toast('User created: @'+uname);nav('adminusers');
-  }catch(e){hideLoad();errEl.textContent='Error: '+e.message;errEl.style.display='block';}
+    await dbRemove('users/'+id);
+    hideLoad();toast(`@${username} deleted permanently`);
+    render('adminusers');
+  }catch(e){hideLoad();toast('Error: '+e.message,'error');}
 }
 
-function rAdminEditUser(){
+async function renderAdminEditUser(){
+  const a=document.getElementById('carea');
   const id=window._editUserId;
-  // Fetch user asynchronously
-  if(!window._editUserData){
-    dbGet('users/'+id).then(u=>{window._editUserData=u;render('admineditur');});
-    return `<div class="alert alert-info">Loading user...</div>`;
-  }
-  const u=window._editUserData;window._editUserData=null;
-  return `<div class="card"><div class="card-hd"><div class="card-title">✏️ Edit User: ${u.name}</div><button class="btn btn-outline btn-sm" onclick="nav('adminusers')">← Back</button></div><div class="card-body">
-  <div class="fg">
-    <div class="field"><label class="req">Full Name</label><input id="eu-name" class="fld" value="${u.name||''}"></div>
-    <div class="field"><label>Username</label><input id="eu-user" class="fld" value="${u.username||''}" style="background:#f8f9fd;" readonly></div>
-    <div class="field"><label>Role</label><input class="fld" value="${u.role||''}" style="background:#f8f9fd;" readonly></div>
-    <div class="field"><label>Department</label><select id="eu-dept" class="fld">${['Pediatrics','OBG & Gynecology','General Medicine','Orthopedics','Administration'].map(d=>`<option ${u.dept===d?'selected':''}>${d}</option>`).join('')}</select></div>
-    <div class="field"><label>Qualification</label><input id="eu-qual" class="fld" value="${u.qual||''}"></div>
-  </div>
-  <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
-    <div style="font-size:13.5px;font-weight:700;margin-bottom:12px;">🔑 Change Password (leave blank to keep current)</div>
-    <div class="fg2">
-      <div class="field"><label>New Password (min 8 chars)</label><input id="eu-pass" type="password" class="fld" placeholder="Leave blank to keep current"></div>
-      <div class="field"><label>Confirm New Password</label><input id="eu-pass2" type="password" class="fld" placeholder="Repeat new password"></div>
+  if(!id){a.innerHTML='<div class="alert alert-warn">No user selected.</div>';return;}
+  a.innerHTML=`<div class="alert alert-info">Loading user...</div>`;
+  try{
+    const u=await dbGet('users/'+id);
+    if(!u){a.innerHTML='<div class="alert alert-danger">User not found in database.</div>';return;}
+    a.innerHTML=`<div class="card">
+    <div class="card-hd">
+      <div class="card-title">✏️ Edit User</div>
+      <button class="btn btn-outline btn-sm" onclick="nav('adminusers')">← Back to Users</button>
     </div>
-  </div>
-  <div id="eu-err" class="alert alert-danger" style="display:none;margin-top:10px;"></div>
-  <div style="margin-top:14px;display:flex;gap:10px;">
-    <button class="btn btn-primary" onclick="saveEditUser('${u.id}')">💾 Save Changes</button>
-    <button class="btn btn-outline" onclick="nav('adminusers')">Cancel</button>
-  </div></div></div>`;
+    <div class="card-body">
+      <!-- User ID display -->
+      <div class="alert alert-info" style="margin-bottom:16px;font-family:'DM Mono',monospace;font-size:12px;">
+        🔑 <b>Account ID:</b> ${u.id} &nbsp;·&nbsp; <b>Username:</b> @${u.username} &nbsp;·&nbsp; <b>Role:</b> ${u.role}
+      </div>
+      <div class="fg">
+        <div class="field"><label class="req">Full Name</label><input id="eu-name" class="fld" value="${u.name||''}"></div>
+        <div class="field"><label>Role</label><input class="fld" value="${u.role||''}" style="background:#f8f9fd;" readonly></div>
+        <div class="field"><label>Department</label><select id="eu-dept" class="fld">
+          ${['Pediatrics','OBG & Gynecology','General Medicine','Orthopedics','Administration'].map(d=>`<option ${u.dept===d?'selected':''}>${d}</option>`).join('')}
+        </select></div>
+        <div class="field"><label>Qualification</label><input id="eu-qual" class="fld" value="${u.qual||''}" placeholder="MD, MS, GNM..."></div>
+        <div class="field"><label>Active Status</label><select id="eu-active" class="fld">
+          <option value="true" ${u.active!==false?'selected':''}>● Active</option>
+          <option value="false" ${u.active===false?'selected':''}>○ Inactive</option>
+        </select></div>
+      </div>
+      <div style="margin-top:18px;padding-top:16px;border-top:2px solid var(--border);">
+        <div style="font-size:13.5px;font-weight:700;margin-bottom:12px;color:var(--navy);">🔑 Change Password</div>
+        <div class="fg2">
+          <div class="field"><label>New Password <span style="font-size:11px;color:var(--muted);">(leave blank to keep current)</span></label>
+            <input id="eu-pass" type="password" class="fld" placeholder="Min 8 characters"></div>
+          <div class="field"><label>Confirm New Password</label>
+            <input id="eu-pass2" type="password" class="fld" placeholder="Repeat"></div>
+        </div>
+      </div>
+      <div id="eu-err" class="alert alert-danger" style="display:none;margin-top:12px;"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveAdminEditUser('${u.id}')">💾 Save Changes</button>
+        <button class="btn btn-outline" onclick="nav('adminusers')">Cancel</button>
+        ${u.id!==S.user.id?`<button class="btn btn-danger btn-sm" style="margin-left:auto;" onclick="adminDeleteUser('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.username}')">🗑 Delete Account</button>`:''}
+      </div>
+    </div></div>`;
+    setupEnterNav();
+  }catch(e){
+    a.innerHTML=`<div class="alert alert-danger">Error loading user: ${e.message}</div>`;
+  }
 }
 
-async function saveEditUser(id){
+async function saveAdminEditUser(id){
   const name=document.getElementById('eu-name').value.trim();
   const dept=document.getElementById('eu-dept').value;
   const qual=document.getElementById('eu-qual').value.trim();
+  const active=document.getElementById('eu-active').value==='true';
   const pass=document.getElementById('eu-pass').value;
   const pass2=document.getElementById('eu-pass2').value;
   const errEl=document.getElementById('eu-err');errEl.style.display='none';
   if(!name){errEl.textContent='Name is required.';errEl.style.display='block';return;}
   if(pass&&pass.length<8){errEl.textContent='Password must be at least 8 characters.';errEl.style.display='block';return;}
   if(pass&&pass!==pass2){errEl.textContent='Passwords do not match.';errEl.style.display='block';return;}
-  showLoad('Saving...');
+  showLoad('Saving changes...');
   try{
-    const upd={name,dept,qual};
+    const upd={name,dept,qual,active};
     if(pass){upd.passHash=await hashPass(pass);upd.passwordChangedAt=new Date().toISOString();}
     await dbUpdate('users/'+id,upd);
-    hideLoad();toast('User updated!');nav('adminusers');
+    hideLoad();toast('User updated successfully');nav('adminusers');
   }catch(e){hideLoad();errEl.textContent='Error: '+e.message;errEl.style.display='block';}
+}
+
+// Keep old names as aliases for any remaining calls
+function editUser(id){adminEditUser(id);}
+async function toggleUser(id,ca){await toggleUserActive(id,ca,'this user');}
+async function deleteUser(id,name,uname){await adminDeleteUser(id,name,uname);}
+async function saveEditUser(id){await saveAdminEditUser(id);}
+
+// ================================================================
+// ADMIN — ADD USER FORM
+// ================================================================
+function rAdminAddUser(){
+  return `<div class="card">
+  <div class="card-hd">
+    <div class="card-title">➕ Add New User Account</div>
+    <button class="btn btn-outline btn-sm" onclick="nav('adminusers')">← Back</button>
+  </div>
+  <div class="card-body">
+    <div class="alert alert-info" style="margin-bottom:16px;font-size:13px;">
+      A unique System ID is auto-assigned on creation. The <b>Username</b> is used to log in.
+    </div>
+    <div class="fg">
+      <div class="field"><label class="req">Full Name</label>
+        <input id="nu-name" class="fld" placeholder="Dr. Firstname Lastname"></div>
+      <div class="field"><label class="req">Login Username</label>
+        <input id="nu-user" class="fld" placeholder="e.g. doc_ritik (no spaces)" oninput="this.value=this.value.replace(/\\s/g,'').toLowerCase()"></div>
+      <div class="field"><label class="req">Role</label>
+        <select id="nu-role" class="fld" onchange="toggleDeptField()">
+          <option value="doctor">🩺 Doctor</option>
+          <option value="nurse">👩‍⚕️ Nurse</option>
+          <option value="admin">⚙️ Admin</option>
+        </select>
+      </div>
+      <div class="field" id="dept-field"><label class="req">Department</label>
+        <select id="nu-dept" class="fld">
+          <option>Pediatrics</option>
+          <option>OBG &amp; Gynecology</option>
+          <option>General Medicine</option>
+          <option>Orthopedics</option>
+        </select>
+      </div>
+      <div class="field"><label>Qualification</label>
+        <input id="nu-qual" class="fld" placeholder="MD, MS, GNM, MBBS..."></div>
+      <div class="field"><label>System ID <span style="font-size:11px;color:var(--muted);">(auto-generated)</span></label>
+        <input class="fld" value="usr_xxxxxxxx" id="nu-id-preview" style="background:#f8f9fd;font-family:monospace;font-size:12px;color:#6b7a9d;" readonly></div>
+      <div class="field"><label class="req">Password</label>
+        <input id="nu-pass" type="password" class="fld" placeholder="Minimum 8 characters"></div>
+      <div class="field"><label class="req">Confirm Password</label>
+        <input id="nu-pass2" type="password" class="fld" placeholder="Repeat password"></div>
+    </div>
+    <div id="nu-err" class="alert alert-danger" style="display:none;margin-top:12px;"></div>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-teal" onclick="addUser()">✅ Create Account</button>
+      <button class="btn btn-outline" onclick="nav('adminusers')">Cancel</button>
+    </div>
+  </div></div>`;
+}
+
+function toggleDeptField(){
+  const r=document.getElementById('nu-role')?.value;
+  const d=document.getElementById('dept-field');
+  if(d)d.style.display=r==='admin'?'none':'flex';
+}
+
+async function addUser(){
+  const name=(document.getElementById('nu-name').value||'').trim();
+  const uname=(document.getElementById('nu-user').value||'').trim().replace(/\s/g,'').toLowerCase();
+  const role=document.getElementById('nu-role').value;
+  const dept=role==='admin'?'Administration':(document.getElementById('nu-dept')?.value||'');
+  const qual=(document.getElementById('nu-qual').value||'').trim();
+  const pass=document.getElementById('nu-pass').value;
+  const pass2=document.getElementById('nu-pass2').value;
+  const errEl=document.getElementById('nu-err');
+  errEl.style.display='none';
+  if(!name||!uname||!pass){errEl.textContent='Fill all required fields (marked *).';errEl.style.display='block';return;}
+  if(uname.length<3){errEl.textContent='Username must be at least 3 characters.';errEl.style.display='block';return;}
+  if(pass.length<8){errEl.textContent='Password must be at least 8 characters.';errEl.style.display='block';return;}
+  if(pass!==pass2){errEl.textContent='Passwords do not match.';errEl.style.display='block';return;}
+  showLoad('Creating account...');
+  try{
+    const existing=await dbGet('users')||{};
+    if(Object.values(existing).some(u=>u.username===uname)){
+      hideLoad();errEl.textContent='Username @'+uname+' already taken — choose another.';errEl.style.display='block';return;
+    }
+    const ph=await hashPass(pass);
+    const id='usr_'+uid();
+    await dbSet('users/'+id,{id,username:uname,name,role,dept,qual,passHash:ph,active:true,createdAt:new Date().toISOString(),createdBy:S.user.name});
+    hideLoad();
+    // Show success modal with credentials
+    showModal(`<div class="modal-hd"><h3>✅ Account Created</h3><button class="modal-cls" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:14px;">
+        <div style="font-size:15px;font-weight:800;color:#065f46;margin-bottom:10px;">🎉 ${name} — account is live</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          <tr><td style="padding:4px 0;color:#6b7a9d;width:110px;">Username</td><td style="font-weight:800;font-family:monospace;color:#0f172a;">@${uname}</td></tr>
+          <tr><td style="padding:4px 0;color:#6b7a9d;">Role</td><td style="font-weight:700;">${role.toUpperCase()} · ${dept}</td></tr>
+          <tr><td style="padding:4px 0;color:#6b7a9d;">System ID</td><td style="font-weight:700;font-family:monospace;font-size:11.5px;color:#374151;">${id}</td></tr>
+          <tr><td style="padding:4px 0;color:#6b7a9d;">Status</td><td><span style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:20px;font-weight:700;font-size:12px;">● Active</span></td></tr>
+        </table>
+      </div>
+      <div style="font-size:12px;color:#6b7a9d;">Share the username and password with the user. They can log in immediately.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-teal" onclick="closeModal();nav('adminusers')">View All Users</button>
+      <button class="btn btn-outline" onclick="closeModal();nav('adminadduser')">Add Another</button>
+    </div>`);
+  }catch(e){hideLoad();errEl.textContent='Firebase error: '+e.message;errEl.style.display='block';}
 }
 
 function rAdminLogs(){
