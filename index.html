@@ -535,20 +535,45 @@ async function checkSetupDone(){
 // STARTUP ROUTER
 // ================================================================
 async function startup(){
-  showLoad('Initializing...');
+  showLoad('Connecting to Firebase...');
   const cfg=loadFbConfig();
   if(!cfg){hideLoad();showScreen('setup');return;}
   const ok=await initFirebase(cfg);
-  if(!ok){hideLoad();localStorage.removeItem('chwh_fbconfig');toast('Firebase init failed — config cleared. Please re-enter.','error');showScreen('setup');return;}
-  showLoad('Connecting to database...');
+  if(!ok){
+    hideLoad();localStorage.removeItem('chwh_fbconfig');
+    showOfflineBlock('Firebase configuration error. Config cleared — please re-enter.');
+    return;
+  }
+  showLoad('Verifying database connection...');
   try{
+    // Hard timeout — if Firebase doesn't respond in 10s, block the app
+    await Promise.race([
+      DB.ref('.info/connected').once('value'),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Connection timeout (10s)')),10000))
+    ]);
     const done=await checkSetupDone();
     hideLoad();
     if(!done){showScreen('setup');}
     else{listenRealtime();showScreen('login');}
   }catch(e){
-    hideLoad();toast('Cannot reach database. Check internet & Firebase rules.','error');showScreen('login');
+    hideLoad();
+    showOfflineBlock('Cannot reach Firebase database.<br><br>Possible reasons:<br>• No internet connection<br>• Firebase database URL changed<br>• Firebase project deleted or paused<br><br><b>This app does not work offline. Please restore connectivity.</b><br><br>Error: '+e.message);
   }
+}
+
+function showOfflineBlock(msg){
+  // Hard block — app does NOT load without Firebase
+  document.body.innerHTML=`
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0d1f3c,#1a2744);padding:20px;">
+  <div style="background:#fff;border-radius:20px;padding:32px;max-width:460px;width:100%;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.4);">
+    <div style="font-size:52px;margin-bottom:14px;">🔴</div>
+    <div style="font-size:20px;font-weight:800;color:#1a2744;margin-bottom:10px;">Database Unreachable</div>
+    <div style="font-size:13.5px;color:#6b7a9d;line-height:1.7;margin-bottom:22px;">${msg}</div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button onclick="location.reload()" style="padding:10px 22px;background:#1a2744;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">🔄 Retry</button>
+      <button onclick="localStorage.removeItem('chwh_fbconfig');location.reload()" style="padding:10px 22px;background:transparent;border:2px solid #dde3f0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;color:#1a2744;">⚙ Reconfigure Firebase</button>
+    </div>
+  </div></div>`;
 }
 
 function showScreen(s){
@@ -1378,32 +1403,36 @@ function rAdminUsers(){
     const usersData=window._adminUsers||{};
     if(!window._adminUsersLoaded){
       dbGet('users').then(d=>{window._adminUsers=d||{};window._adminUsersLoaded=true;render('adminusers');});
-      return `<div class="alert alert-info">Loading users...</div>`;
+      return `<div class="alert alert-info">Loading users from Firebase...</div>`;
     }
-    const users=Object.values(usersData);
-    window._adminUsersLoaded=false; // reset for next render
+    const users=Object.values(usersData).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    window._adminUsersLoaded=false;
     return `
     <div class="admin-banner"><span style="font-size:28px;">👥</span><div>
       <div style="font-size:16px;font-weight:700;">User Management</div>
-      <div style="font-size:13px;opacity:.8;">Add, edit, or deactivate OPD system accounts</div>
-    </div><button class="btn btn-teal btn-sm" style="margin-left:auto;" onclick="nav('adminadduser')">+ Add User</button></div>
+      <div style="font-size:13px;opacity:.8;">Add, edit, activate/deactivate, or permanently delete accounts</div>
+    </div><button class="btn btn-teal btn-sm" style="margin-left:auto;" onclick="nav('adminadduser')">➕ Add New User</button></div>
     <div class="card">
       <div class="card-hd"><div class="card-title">All Users (${users.length})</div><button class="btn btn-outline btn-sm" onclick="reloadUsers()">🔄 Refresh</button></div>
       ${users.length===0?'<div class="card-body" style="text-align:center;padding:36px;color:var(--muted);">No users found</div>':
       users.map(u=>`<div class="user-row">
-        <div style="display:flex;align-items:center;gap:12px;flex:1;">
-          <div class="user-av" style="background:${u.role==='admin'?'#6d28d9':u.role==='doctor'?'#1d4ed8':'#be185d'}">${(u.name||'?')[0]}</div>
-          <div>
+        <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
+          <div class="user-av" style="background:${u.role==='admin'?'#6d28d9':u.role==='doctor'?'#1d4ed8':'#be185d'};flex-shrink:0;">${(u.name||'?')[0].toUpperCase()}</div>
+          <div style="min-width:0;">
             <div style="font-size:14px;font-weight:700;">${u.name}</div>
-            <div style="font-size:12px;color:var(--muted);">@${u.username} · ${u.dept||''}</div>
-            ${u.lastLogin?`<div style="font-size:11px;color:var(--muted);">Last login: ${fmtD(u.lastLogin.split('T')[0])}</div>`:''}
+            <div style="font-size:12px;color:var(--muted);">@${u.username} · ${u.dept||''} · ${u.qual||''}</div>
+            ${u.lastLogin?`<div style="font-size:11px;color:var(--muted);">Last login: ${fmtD(u.lastLogin.split('T')[0])}</div>`:
+            `<div style="font-size:11px;color:var(--muted);">Never logged in</div>`}
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0;">
           <span class="role-badge rb-${u.role}">${u.role}</span>
-          <span style="font-size:11px;padding:2px 7px;border-radius:20px;font-weight:600;${u.active!==false?'background:#d1fae5;color:#065f46;':'background:#fee2e2;color:#991b1b;'}">${u.active!==false?'Active':'Inactive'}</span>
+          <span style="font-size:11px;padding:2px 7px;border-radius:20px;font-weight:600;${u.active!==false?'background:#d1fae5;color:#065f46;':'background:#fee2e2;color:#991b1b;'}">${u.active!==false?'● Active':'○ Inactive'}</span>
           <button class="btn btn-outline btn-xs" onclick="editUser('${u.id}')">✏️ Edit</button>
-          ${u.id!==S.user.id?`<button class="btn btn-xs" style="background:${u.active!==false?'#fee2e2':'#d1fae5'};color:${u.active!==false?'#991b1b':'#065f46'};border:none;cursor:pointer;" onclick="toggleUser('${u.id}',${u.active!==false})">${u.active!==false?'Deactivate':'Activate'}</button>`:'<span style="font-size:11px;color:var(--muted);">(you)</span>'}
+          ${u.id!==S.user.id?`
+          <button class="btn btn-xs" style="background:${u.active!==false?'#fef3c7':'#d1fae5'};color:${u.active!==false?'#92400e':'#065f46'};border:1px solid ${u.active!==false?'#fde68a':'#6ee7b7'};cursor:pointer;border-radius:6px;padding:4px 9px;font-size:11.5px;font-weight:600;" onclick="toggleUser('${u.id}',${u.active!==false})">${u.active!==false?'⏸ Deactivate':'▶ Activate'}</button>
+          <button class="btn btn-xs" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;cursor:pointer;border-radius:6px;padding:4px 9px;font-size:11.5px;font-weight:600;" onclick="deleteUser('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.username}')">🗑 Delete</button>
+          `:'<span style="font-size:11px;background:#eef2fb;padding:3px 7px;border-radius:20px;color:var(--muted);">You</span>'}
         </div>
       </div>`).join('')}
     </div>`;
@@ -1418,6 +1447,17 @@ async function toggleUser(id,currentActive){
   showLoad('Updating...');
   try{await dbUpdate('users/'+id,{active:!currentActive});hideLoad();toast(currentActive?'User deactivated':'User activated');reloadUsers();}
   catch(e){hideLoad();toast('Error: '+e.message,'error');}
+}
+
+async function deleteUser(id,name,username){
+  // Double confirmation for destructive action
+  if(!confirm(`⚠️ DELETE USER?\n\nName: ${name}\nUsername: @${username}\n\nThis is permanent and cannot be undone. Proceed?`))return;
+  if(!confirm(`Confirm: permanently delete @${username}?`))return;
+  showLoad('Deleting user...');
+  try{
+    await dbRemove('users/'+id);
+    hideLoad();toast(`User @${username} deleted permanently`);reloadUsers();
+  }catch(e){hideLoad();toast('Error: '+e.message,'error');}
 }
 
 function rAdminAddUser(){
