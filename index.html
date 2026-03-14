@@ -13,6 +13,7 @@
 <!-- Firebase 9 Compat SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -591,8 +592,16 @@ async function initFirebase(config){
     }
     firebase.initializeApp(config);
     DB=firebase.database();
+    // Sign in anonymously so Firebase Rules (auth != null) are satisfied.
+    // This does NOT give any user access to the app — the app's own
+    // login system controls that. Anonymous auth just proves the request
+    // is coming from this app, not a random script with a stolen API key.
+    await firebase.auth().signInAnonymously();
     return true;
-  }catch(e){console.error('Firebase init error:',e);return false;}
+  }catch(e){
+    console.error('Firebase init error:',e);
+    return false;
+  }
 }
 
 async function checkSetupDone(){
