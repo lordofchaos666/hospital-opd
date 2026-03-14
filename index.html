@@ -493,11 +493,14 @@ const INVESTIGATIONS={
 // Once filled, ALL devices (mobile/desktop) connect automatically.
 // ================================================================
 const FIREBASE_CONFIG = {
-  apiKey:        "AIzaSyBR8OGP7CpI9zOjDF41ytodGg3kWjhEH_E",   // ← paste your apiKey here
-  authDomain:    "chandrawati-opd.firebaseapp.com",   // ← e.g. your-project.firebaseapp.com
-  databaseURL:   "https://chandrawati-opd-default-rtdb.asia-southeast1.firebasedatabase.app",   // ← e.g. https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app
-  projectId:     "chandrawati-opd",   // ← e.g. your-project-id
-  appId:         "1:640465284230:web:6f6afd973a82310be4f507"    // ← e.g. 1:123456789:web:abcdef
+  apiKey:            "AIzaSyBR8OGP7CpI9zOjDF41ytodGg3kWjhEH_E",
+  authDomain:        "chandrawati-opd.firebaseapp.com",
+  databaseURL:       "https://chandrawati-opd-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "chandrawati-opd",
+  storageBucket:     "chandrawati-opd.firebasestorage.app",
+  messagingSenderId: "640465284230",
+  appId:             "1:640465284230:web:6f6afd973a82310be4f507",
+  measurementId:     "G-9N6DTFZG4G"
 };
 // Set to true once you fill in all 5 values above
 const FIREBASE_HARDCODED = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.projectId);
@@ -979,7 +982,7 @@ function rRegister(){
   return `<div class="card"><div class="card-hd"><div class="card-title">➕ Register New Patient</div></div><div class="card-body">
   <div class="fg">
     <div class="field"><label class="req">Full Name</label><input id="rg-name" class="fld" placeholder="Patient's full name"></div>
-    <div class="field"><label class="req">Date of Birth</label><input id="rg-dob" type="date" class="fld" max="${today()}"></div>
+    <div class="field"><label class="req">Date of Birth</label><input id="rg-dob" type="date" class="fld"></div>
     <div class="field"><label class="req">Gender</label><select id="rg-sex" class="fld"><option value="">Select</option><option value="male">♂ Male</option><option value="female">♀ Female</option></select></div>
     <div class="field"><label class="req">Department</label><select id="rg-dept" class="fld"><option value="">Select</option><option>Pediatrics</option><option>OBG & Gynecology</option><option>General Medicine</option><option>Orthopedics</option></select></div>
     <div class="field"><label>Phone Number</label><input id="rg-phone" class="fld" type="tel" placeholder="10-digit mobile"></div>
@@ -1005,24 +1008,41 @@ async function doRegister(){
   try{
     const uhid=await genUHID();
     const ptId=uid();
-    const pt={id:ptId,uhid,name,dob,sex,dept,phone:document.getElementById('rg-phone').value||'',guardian:document.getElementById('rg-guardian').value||'',addr:document.getElementById('rg-addr').value||'',allergy:document.getElementById('rg-allergy').value||'',bg:document.getElementById('rg-bg').value||'',ref:document.getElementById('rg-ref').value||'',regDate:today(),registeredBy:S.user.name};
+    const pt={id:ptId,uhid,name,dob,sex,dept,
+      phone:document.getElementById('rg-phone').value||'',
+      guardian:document.getElementById('rg-guardian').value||'',
+      addr:document.getElementById('rg-addr').value||'',
+      allergy:document.getElementById('rg-allergy').value||'',
+      bg:document.getElementById('rg-bg').value||'',
+      ref:document.getElementById('rg-ref').value||'',
+      regDate:today(),registeredBy:S.user.name};
     await dbSet('patients/'+ptId,pt);
+    // IMMEDIATE LOCAL UPDATE — don't wait for Firebase listener
+    // This ensures vitals dropdown shows the new patient right away
+    S.pts[ptId]=pt;
+
     const visitId=uid();
-    const visit={id:visitId,ptId,date:today(),dept,status:'waiting',vitals:{},anthro:{},complaints:'',exam:'',diag:'',rx:[],inv:[],instructions:'',followup:'',docId:'',docName:'',createdAt:new Date().toISOString()};
+    const visit={id:visitId,ptId,date:today(),dept,status:'waiting',
+      vitals:{},anthro:{},complaints:'',exam:'',diag:'',rx:[],inv:[],
+      instructions:'',followup:'',docId:'',docName:'',
+      createdAt:new Date().toISOString()};
     await dbSet('visits/'+visitId,visit);
+    // IMMEDIATE LOCAL UPDATE for visits too
+    S.visits[visitId]=visit;
+
     hideLoad();toast('Registered! UHID: '+uhid);
     showModal(`<div class="modal-hd"><h3>✅ Patient Registered</h3><button class="modal-cls" onclick="closeModal()">×</button></div>
     <div class="modal-body">
-      <div class="alert alert-success"><b>${name}</b> registered successfully in Firebase database.</div>
+      <div class="alert alert-success"><b>${name}</b> registered successfully.</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
         <div class="stat-card"><div class="stat-lbl">UHID</div><div style="font-size:20px;font-weight:800;color:var(--teal);">${uhid}</div></div>
-        <div class="stat-card"><div class="stat-lbl">Age</div><div style="font-size:17px;font-weight:700;">${calcAge(dob)}</div></div>
+        <div class="stat-card"><div class="stat-lbl">Age / Sex</div><div style="font-size:17px;font-weight:700;">${calcAge(dob)} / ${sex==='male'?'M':'F'}</div></div>
+        <div class="stat-card" style="grid-column:span 2;"><div class="stat-lbl">Department</div><div style="font-size:15px;font-weight:700;">${dept}</div></div>
       </div>
-      <p style="margin-top:12px;font-size:13px;color:var(--muted);">Added to <b>${dept}</b> OPD queue. Accessible from all devices.</p>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-teal" onclick="closeModal();S.selPt=S.pts['${ptId}']||Object.values(S.pts).find(p=>p.uhid==='${uhid}');nav('vitals')">Record Vitals</button>
-      <button class="btn btn-outline" onclick="closeModal();render('register')">Register Another</button>
+      <button class="btn btn-teal" onclick="closeModal();S.selPt=S.pts['${ptId}'];nav('vitals')">🩺 Record Vitals Now</button>
+      <button class="btn btn-outline" onclick="closeModal();render('register')">➕ Register Another</button>
     </div>`);
   }catch(e){hideLoad();toast('Error: '+e.message,'error');}
 }
@@ -1118,12 +1138,22 @@ async function updSt(vid,st){
 // ================================================================
 function rVitals(){
   const sp=S.selPt;
+  const allPts=ptsArr();
+  // Today's queue patient IDs for prominent grouping
+  const todayPtIds=new Set(visArr().filter(v=>v.date===today()).map(v=>v.ptId));
+  const todayPts=allPts.filter(p=>todayPtIds.has(p.id));
+  const otherPts=allPts.filter(p=>!todayPtIds.has(p.id));
   return `<div class="card"><div class="card-hd"><div class="card-title">🩺 Record Vitals</div></div><div class="card-body">
-  <div class="field" style="margin-bottom:16px;max-width:420px;">
-    <label>Select Patient</label>
+  <div class="field" style="margin-bottom:16px;max-width:480px;">
+    <label>Select Patient <span style="font-size:11px;color:var(--muted);">(${todayPts.length} in today's queue)</span></label>
     <select id="vsel" class="fld" onchange="onVitSel(this.value)">
       <option value="">-- Select Patient --</option>
-      ${ptsArr().map(p=>`<option value="${p.id}" ${sp&&sp.id===p.id?'selected':''}>${p.uhid} — ${p.name} (${calcAge(p.dob)})</option>`).join('')}
+      ${todayPts.length>0?`<optgroup label="📋 Today's Queue (${todayPts.length})">
+        ${todayPts.map(p=>`<option value="${p.id}" ${sp&&sp.id===p.id?'selected':''}>${p.uhid} — ${p.name} (${calcAge(p.dob)})</option>`).join('')}
+      </optgroup>`:''}
+      ${otherPts.length>0?`<optgroup label="📁 All Other Patients">
+        ${otherPts.map(p=>`<option value="${p.id}" ${sp&&sp.id===p.id?'selected':''}>${p.uhid} — ${p.name} (${calcAge(p.dob)})</option>`).join('')}
+      </optgroup>`:''}
     </select>
   </div>
   <div id="vform">${sp?rVitForm(sp):'<div class="alert alert-info">Select a patient above to record vitals.</div>'}</div>
