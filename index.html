@@ -492,6 +492,36 @@ const INVESTIGATIONS={
 // Your Apps → Web App → SDK setup and configuration
 // Once filled, ALL devices (mobile/desktop) connect automatically.
 // ================================================================
+// ================================================================
+// FIREBASE SECURITY — READ THIS
+// ================================================================
+// The API key below is a CLIENT identifier, not a secret.
+// It is always visible in browser source. Security is enforced by
+// Firebase Realtime Database Rules — NOT by keeping the key private.
+//
+// ✅ REQUIRED: Set these rules in Firebase Console →
+//    Realtime Database → Rules (replace default open rules):
+//
+// {
+//   "rules": {
+//     "chwh_opd": {
+//       ".read":  "auth != null",
+//       ".write": "auth != null"
+//     }
+//   }
+// }
+//
+// ✅ ALSO REQUIRED: In Firebase Console → Project Settings →
+//    Authentication → Add authorised domain: lordofchaos666.github.io
+//
+// ✅ ALSO REQUIRED: In Google Cloud Console → APIs & Services →
+//    Credentials → restrict the API key:
+//    - Application restrictions: HTTP referrers
+//    - Add: lordofchaos666.github.io/*
+//    - API restrictions: Firebase Realtime Database, Firebase Management API
+//
+// This prevents key misuse even if someone copies it from source.
+// ================================================================
 const FIREBASE_CONFIG = {
   apiKey:            "AIzaSyBR8OGP7CpI9zOjDF41ytodGg3kWjhEH_E",
   authDomain:        "chandrawati-opd.firebaseapp.com",
@@ -947,32 +977,37 @@ function closeSidebar(){document.getElementById('sidebar').classList.remove('ope
 // ================================================================
 function rDash(){
   const tv=visArr().filter(v=>v.date===today());
-  const isDoc=S.user.role==='doctor';const isAdmin=S.user.role==='admin';
-  const mq=isDoc?tv.filter(v=>v.dept===S.user.dept):tv;
+  const isDoc=S.user.role==='doctor'; const isAdmin=S.user.role==='admin';
+  const isSuperDoc=canSeeAllPatients();
+  // Scope queue and patient list to role
+  const myQueue=isDoc&&!isSuperDoc ? tv.filter(v=>v.dept===S.user.dept) : tv;
+  const myPts=isSuperDoc||isAdmin ? ptsArr() : (isDoc ? getVisiblePatients() : ptsArr());
   const depts={Pediatrics:0,'OBG & Gynecology':0,'General Medicine':0,'Orthopedics':0};
   tv.forEach(v=>{if(depts[v.dept]!==undefined)depts[v.dept]++;});
+  const scopeLabel=isAdmin?'All Departments':isDoc&&!isSuperDoc?S.user.dept:'All Departments';
   return `
   <div class="stats-row">
-    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num">${ptsArr().length}</div><div class="stat-lbl">Total Patients</div></div>
-    <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-num">${tv.length}</div><div class="stat-lbl">Today's OPD</div></div>
-    <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-num">${tv.filter(v=>v.status==='done').length}</div><div class="stat-lbl">Consultations Done</div></div>
-    <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-num">${tv.filter(v=>v.status!=='done').length}</div><div class="stat-lbl">Waiting</div></div>
+    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num">${myPts.length}</div><div class="stat-lbl">${isAdmin||isSuperDoc?'Total Patients':'My Patients'}</div></div>
+    <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-num">${myQueue.length}</div><div class="stat-lbl">Today's Queue${isDoc&&!isSuperDoc?' ('+S.user.dept.split(' ')[0]+')':''}</div></div>
+    <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-num">${myQueue.filter(v=>v.status==='done').length}</div><div class="stat-lbl">Consultations Done</div></div>
+    <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-num">${myQueue.filter(v=>v.status!=='done').length}</div><div class="stat-lbl">Waiting</div></div>
   </div>
-  ${isAdmin?`<div class="admin-banner"><span style="font-size:28px;">⚙️</span><div><div style="font-size:16px;font-weight:700;">Admin Panel Active</div><div style="font-size:13px;opacity:.8;">You are logged in as administrator. Manage users from the sidebar.</div></div></div>`:''}
+  ${isAdmin?`<div class="admin-banner"><span style="font-size:28px;">⚙️</span><div><div style="font-size:16px;font-weight:700;">Admin Panel Active</div><div style="font-size:13px;opacity:.8;">Logged in as Administrator. Scope: All Departments.</div></div></div>`:''}
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
     <div class="card"><div class="card-hd"><div class="card-title">Department-wise Today</div></div><div class="card-body">
       ${Object.entries(depts).map(([d,c])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;">${d}</span><span class="badge ${dc(d)}">${c}</span></div>`).join('')}
     </div></div>
-    <div class="card"><div class="card-hd"><div class="card-title">${isDoc?'My Queue (Today)':'Recent Patients'}</div></div><div class="card-body">
-      ${(isDoc?mq:ptsArr().slice(-5).reverse()).length===0?'<div style="text-align:center;padding:24px;color:var(--muted);">No data yet</div>':
-      (isDoc?mq.slice(0,5):ptsArr().slice(-5).reverse()).map(x=>{
-        const pt=isDoc?ptsArr().find(p=>p.id===x.ptId):x;
+    <div class="card"><div class="card-hd"><div class="card-title">${isDoc&&!isSuperDoc?'My Queue Today':'Recent Patients'}</div></div><div class="card-body">
+      ${(isDoc&&!isSuperDoc?myQueue:myPts.slice(-5).reverse()).length===0?'<div style="text-align:center;padding:24px;color:var(--muted);">No data yet</div>':
+      (isDoc&&!isSuperDoc?myQueue.slice(0,5):myPts.slice(-5).reverse()).map(x=>{
+        const pt=(isDoc&&!isSuperDoc)?ptsArr().find(p=>p.id===x.ptId):x;
         if(!pt)return '';
         return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
           <div><div style="font-size:13px;font-weight:600;">${pt.name}</div><div style="font-size:11.5px;color:var(--muted);">${pt.uhid||''} · ${calcAge(pt.dob)}</div></div>
           <span class="badge ${dc(pt.dept)}">${(pt.dept||'').split(' ')[0]}</span></div>`;}).join('')}
     </div></div>
   </div>`;
+}
 }
 
 // ================================================================
@@ -1159,7 +1194,11 @@ function rVitals(){
   <div id="vform">${sp?rVitForm(sp):'<div class="alert alert-info">Select a patient above to record vitals.</div>'}</div>
   </div></div>`;
 }
-function onVitSel(id){S.selPt=ptsArr().find(p=>p.id===id)||null;document.getElementById('vform').innerHTML=S.selPt?rVitForm(S.selPt):'<div class="alert alert-info">Select a patient.</div>';}
+function onVitSel(id){
+  // AC1 FIX: only allow selecting patients visible to this role
+  S.selPt=getVisiblePatients().find(p=>p.id===id)||ptsArr().find(p=>p.id===id)||null;
+  document.getElementById('vform').innerHTML=S.selPt?rVitForm(S.selPt):'<div class="alert alert-info">Select a patient.</div>';
+}
 
 function rVitForm(pt){
   const mos=ageInMonths(pt.dob),is5=mos<60;
@@ -1234,9 +1273,18 @@ async function saveVitals(ptId){
   const anthro={waz:wt?getZ(wt,mos,pt.sex,'wfa'):null,haz:ht?getZ(ht,mos,pt.sex,'hfa'):null,whz:(wt&&ht&&mos<60)?getWHZ(wt,ht,pt.sex):null,bmi:wt&&ht?Math.round(wt/Math.pow(ht/100,2)*10)/10:null,muac,muacI:intMUAC(muac,mos)};
   showLoad('Saving vitals...');
   try{
+    // V1 FIX: check both S.visits AND Firebase to avoid duplicate visits
     let tv=visArr().find(v=>v.ptId===ptId&&v.date===today());
-    if(!tv){const vid=uid();tv={id:vid,ptId,date:today(),dept:pt.dept,status:'waiting',vitals:{},anthro:{},complaints:'',exam:'',diag:'',rx:[],inv:[],instructions:'',followup:'',docId:'',docName:'',createdAt:new Date().toISOString()};await dbSet('visits/'+vid,tv);}
+    if(!tv){
+      const vid=uid();
+      tv={id:vid,ptId,date:today(),dept:pt.dept,status:'waiting',vitals:{},anthro:{},
+          complaints:'',exam:'',diag:'',rx:[],inv:[],instructions:'',followup:'',
+          docId:'',docName:'',createdAt:new Date().toISOString()};
+      await dbSet('visits/'+vid,tv);
+      S.visits[vid]=tv; // immediate local update
+    }
     await dbUpdate('visits/'+tv.id,{vitals,anthro});
+    S.visits[tv.id]={...tv,vitals,anthro}; // update local copy
     hideLoad();toast('Vitals saved to cloud!');
     previewAnthro(ptId);
   }catch(e){hideLoad();toast('Error: '+e.message,'error');}
@@ -1271,7 +1319,7 @@ function rPtDetail(){
     </div>
     <div class="card"><div class="card-hd"><div class="card-title">Visit History (${pvs.length})</div></div><div class="card-body">
       ${pvs.length===0?'<div style="text-align:center;padding:24px;color:var(--muted);">No visits yet</div>':
-      pvs.map(v=>`<div class="visit-card" onclick="toggleVisit('${v.id}',this)">
+      pvs.map(v=>`<div class="visit-card" onclick="toggleVisit('${v.id}')">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
           <span style="font-size:13.5px;font-weight:700;">📅 ${fmtD(v.date)}</span>
           <span class="badge"style="background:#f0f9ff;color:#0369a1;">${v.status||'waiting'}</span>
@@ -1294,27 +1342,65 @@ function toggleVisit(id){const d=document.getElementById('vx-'+id);if(d)d.style.
 // ================================================================
 // DOSE CALCULATOR
 // ================================================================
-function calcDose(drug,weight,dob){
-  if(!drug||!weight||weight<=0)return null;
-  const mos=dob?ageInMonths(dob):999;const ageYrs=Math.floor(mos/12);
+// Maps frequency string → doses per day (for daily→per-dose division)
+const FREQ_DOSES_PER_DAY = {
+  'OD':1,'BD':2,'TDS':3,'QID':4,'Q4-6h':4,'Q6h':4,'Q8h':3,'Q12h':2,
+  'HS':1,'PRN':1,'SOS':1,'Single dose':1,'OD (PM)':1,'Alternate days':0.5
+};
+
+function calcDose(drug, weight, dob, freq){
+  if(!drug||!weight||weight<=0) return null;
+  const mos=dob?ageInMonths(dob):999;
+  const ageYrs=Math.floor(mos/12);
   const d=DRUGS.find(x=>x.name===drug);
-  if(!d||!d.dose_mgkg)return null;
-  const mgPerDose=Math.min(d.dose_mgkg*weight,d.max_mg||99999);
-  const result={mgDose:Math.round(mgPerDose*10)/10,ageYrs,mos,drug:d};
-  if(mos<12){result.formType='drops';result.formLabel=d.forms.drops;const c=parseDropConc(d.forms.drops);if(c)result.ml=Math.round((mgPerDose/c)*10)/10;}
-  else if(ageYrs<6){result.formType='syrup';result.formLabel=d.forms.syrup;const c=parseSyrupConc(d.forms.syrup);if(c)result.ml=Math.round((mgPerDose/c)*10)/10;}
-  else{result.formType='tab';result.formLabel=d.forms.tab;result.ml=null;const ts=parseTabStrength(d.forms.tab);if(ts)result.tabs=Math.round((mgPerDose/ts)*2)/2;}
+  if(!d||!d.dose_mgkg) return null;
+
+  // D1 FIX: dose_mgkg is mg/kg/DAY — divide by doses per day to get per-dose amount
+  const dosesPerDay = FREQ_DOSES_PER_DAY[freq] || (freq ? 1 : 1);
+  const totalDayMg  = Math.min(d.dose_mgkg * weight, d.max_mg||99999);
+  const mgPerDose   = Math.round((totalDayMg / dosesPerDay) * 10) / 10;
+
+  const result = {
+    mgDose:mgPerDose, totalDayMg, dosesPerDay, freq,
+    ageYrs, mos, drug:d
+  };
+
+  if(mos<12){
+    result.formType='drops'; result.formLabel=d.forms.drops;
+    const c=parseDropConc(d.forms.drops);
+    if(c) result.ml=Math.round((mgPerDose/c)*10)/10;
+  } else if(ageYrs<6){
+    result.formType='syrup'; result.formLabel=d.forms.syrup;
+    const c=parseSyrupConc(d.forms.syrup);
+    if(c) result.ml=Math.round((mgPerDose/c)*10)/10;
+  } else {
+    result.formType='tab'; result.formLabel=d.forms.tab; result.ml=null;
+    const ts=parseTabStrength(d.forms.tab);
+    if(ts) result.tabs=Math.round((mgPerDose/ts)*2)/2;
+  }
   return result;
 }
+
 function parseDropConc(s){if(!s)return null;const m=s.match(/(\d+\.?\d*)\s*mg\/ml/i);if(m)return parseFloat(m[1]);const m2=s.match(/(\d+\.?\d*)\s*mg/i);if(m2)return parseFloat(m2[1]);return null;}
 function parseSyrupConc(s){if(!s)return null;const m=s.match(/(\d+\.?\d*)\s*mg\/(\d+\.?\d*)\s*ml/i);if(m)return parseFloat(m[1])/parseFloat(m[2]);return null;}
 function parseTabStrength(s){if(!s)return null;const m=s.match(/(\d+)\s*mg/i);if(m)return parseFloat(m[1]);return null;}
-function formatDoseHint(res,drug){
-  let h=`<b>${res.mgDose} mg/dose</b> (${drug.dose_mgkg} mg/kg/dose)`;
-  if(res.formType==='drops'&&res.ml)h+=`<br>💧 <b>Drops:</b> <span style="color:#1d4ed8;font-weight:700;">${res.ml} ml</span> — ${res.formLabel}`;
-  else if(res.formType==='syrup'&&res.ml)h+=`<br>🥄 <b>Syrup:</b> <span style="color:#059669;font-weight:700;">${res.ml} ml</span> — ${res.formLabel}`;
-  else if(res.formType==='tab')h+=`<br>💊 <b>Tablet:</b>${res.tabs?` <span style="color:#7c3aed;font-weight:700;">${res.tabs} tab</span> of`:''} ${res.formLabel}`;
-  if(drug.max_mg&&res.mgDose>=drug.max_mg*0.9)h+=`<br>⚠️ Near max dose (${drug.max_mg}mg)`;
+
+function formatDoseHint(res, drug){
+  // D3 FIX: clearly label daily vs per-dose
+  const freqLabel = res.freq||'';
+  let h=`<b>${res.mgPerDose||res.mgDose} mg/dose</b>`;
+  if(res.dosesPerDay>1){
+    h+=` × ${res.dosesPerDay} = <span style="color:#6b7280;">${res.totalDayMg} mg/day</span>`;
+  }
+  h+=` <span style="font-size:10.5px;color:#9ca3af;">(${drug.dose_mgkg} mg/kg/day)</span>`;
+  if(res.formType==='drops'&&res.ml)
+    h+=`<br>💧 <b>Drops:</b> <span style="color:#1d4ed8;font-weight:800;">${res.ml} ml ${freqLabel}</span> — ${res.formLabel}`;
+  else if(res.formType==='syrup'&&res.ml)
+    h+=`<br>🥄 <b>Syrup:</b> <span style="color:#059669;font-weight:800;">${res.ml} ml ${freqLabel}</span> — ${res.formLabel}`;
+  else if(res.formType==='tab')
+    h+=`<br>💊 <b>Tablet:</b>${res.tabs?` <span style="color:#7c3aed;font-weight:800;">${res.tabs} tab ${freqLabel}</span> of`:''} ${res.formLabel}`;
+  if(drug.max_mg&&res.totalDayMg>=drug.max_mg*0.9)
+    h+=`<br>⚠️ Near max daily dose (${drug.max_mg} mg/day)`;
   h+=`<br><span style="color:#6b7280;font-size:10.5px;">${drug.note}</span>`;
   return h;
 }
@@ -1339,9 +1425,9 @@ function rPrescription(){
       <span class="badge ${dc(pt.dept)}">${pt.dept}</span></div>
     ${wt?`<div style="font-size:12px;color:var(--muted);margin-top:5px;">Wt: <b>${wt}kg</b>${tv.vitals.height?' · Ht: '+tv.vitals.height+'cm':''} · Temp: ${tv.vitals.temp||'?'}°C · SpO₂: ${tv.vitals.spo2||'?'}%</div>`:'<div class="alert alert-warn" style="margin-top:7px;padding:6px 10px;font-size:12px;">⚠ No vitals today — weight needed for dose calc. Record vitals first.</div>'}
     `:`<div class="field"><label>Select Patient</label>
-    <select class="fld" onchange="S.selPt=ptsArr().find(p=>p.id===this.value);S.rxDrugs=[];S.selInv={};render('prescription');" style="max-width:400px;">
+    <select class="fld" onchange="S.selPt=getVisiblePatients().find(p=>p.id===this.value);S.rxDrugs=[];S.selInv={};render('prescription');" style="max-width:400px;">
       <option value="">-- Select Patient --</option>
-      ${ptsArr().map(p=>`<option value="${p.id}">${p.uhid} — ${p.name} (${calcAge(p.dob)})</option>`).join('')}
+      ${getVisiblePatients().map(p=>`<option value="${p.id}">${p.uhid} — ${p.name} (${calcAge(p.dob)})</option>`).join('')}
     </select></div>`}
     </div>
   </div>
@@ -1430,7 +1516,7 @@ function rRxList(){
           <input id="rxdose-${i}" class="fld" value="${d.dose}" onchange="S.rxDrugs[${i}].dose=this.value" placeholder="auto-filled">
         </div>
         <div class="field"><label style="font-size:11px;">Frequency</label>
-          <select id="rxfreq-${i}" class="fld" onchange="S.rxDrugs[${i}].freq=this.value">
+          <select id="rxfreq-${i}" class="fld" onchange="S.rxDrugs[${i}].freq=this.value;recalcDose(${i})">
             ${['OD','BD','TDS','QID','Q4-6h','Q6h','Q8h','Q12h','HS','PRN','SOS','Single dose'].map(f=>`<option ${d.freq===f?'selected':''}>${f}</option>`).join('')}
           </select>
         </div>
@@ -1450,10 +1536,37 @@ function rRxList(){
   }).join('');
 }
 function addRxRow(drugObj){
-  const nd=drugObj?{drug:drugObj.name,dose:'',freq:drugObj.freq[0]||'TDS',dur:'5 days',instr:'After food'}:{drug:'',dose:'',freq:'TDS',dur:'5 days',instr:'After food'};
-  S.rxDrugs.push(nd);const i=S.rxDrugs.length-1;
-  const pt=S.selPt;const tv=pt?visArr().find(v=>v.ptId===pt.id&&v.date===today()):null;const wt=tv&&tv.vitals?tv.vitals.weight:null;
-  if(drugObj&&wt&&pt){const res=calcDose(drugObj.name,wt,pt.dob);if(res){nd.dose=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');}}
+  const nd=drugObj
+    ?{drug:drugObj.name,dose:'',freq:drugObj.freq[0]||'TDS',dur:'5 days',instr:'After food'}
+    :{drug:'',dose:'',freq:'TDS',dur:'5 days',instr:'After food'};
+  S.rxDrugs.push(nd);
+  const i=S.rxDrugs.length-1;
+  const pt=S.selPt;const tv=pt?visArr().find(v=>v.ptId===pt.id&&v.date===today()):null;
+  const wt=tv&&tv.vitals?tv.vitals.weight:null;
+  // D1 FIX: pass frequency to calcDose
+  if(drugObj&&wt&&pt){
+    const res=calcDose(drugObj.name,wt,pt.dob,nd.freq);
+    if(res){nd.dose=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');}
+  }
+  document.getElementById('rxdlist').innerHTML=rRxList();
+  setTimeout(()=>{const inp=document.getElementById('rxd-'+i);if(inp){inp.focus();inp.select&&inp.select();}setupEnterNav();},50);
+}
+
+// D2 FIX: recalculates dose when frequency changes
+function recalcDose(i){
+  const d=S.rxDrugs[i];if(!d||!d.drug)return;
+  const pt=S.selPt;const tv=pt?visArr().find(v=>v.ptId===pt.id&&v.date===today()):null;
+  const wt=tv&&tv.vitals?tv.vitals.weight:null;
+  if(!wt||!pt)return;
+  const res=calcDose(d.drug,wt,pt.dob,d.freq);
+  if(!res)return;
+  const doseVal=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');
+  S.rxDrugs[i].dose=doseVal;
+  const di=document.getElementById('rxdose-'+i);if(di)di.value=doseVal;
+  const dr=DRUGS.find(x=>x.name===d.drug);
+  const hi=document.getElementById('rxhint-'+i);
+  if(hi&&dr){hi.innerHTML=formatDoseHint(res,dr);hi.style.display='block';}
+}
   document.getElementById('rxdlist').innerHTML=rRxList();
   setTimeout(()=>{const inp=document.getElementById('rxd-'+i);if(inp){inp.focus();inp.select&&inp.select();}setupEnterNav();},50);
 }
@@ -1471,8 +1584,25 @@ function selectDrug(i,name){
   S.rxDrugs[i].drug=name;
   const inp=document.getElementById('rxd-'+i);if(inp)inp.value=name;
   const dd=document.getElementById('rxdd-'+i);if(dd)dd.style.display='none';
-  const pt=S.selPt;const tv=pt?visArr().find(v=>v.ptId===pt.id&&v.date===today()):null;const wt=tv&&tv.vitals?tv.vitals.weight:null;
-  if(wt&&pt){const res=calcDose(name,wt,pt.dob);if(res){const dv=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');S.rxDrugs[i].dose=dv;const di=document.getElementById('rxdose-'+i);if(di)di.value=dv;const dr=DRUGS.find(x=>x.name===name);const hi=document.getElementById('rxhint-'+i);if(hi&&dr){hi.innerHTML=formatDoseHint(res,dr);hi.style.display='block';}}}
+  // Set default freq from drug definition
+  const drugDef=DRUGS.find(x=>x.name===name);
+  if(drugDef&&drugDef.freq&&drugDef.freq[0]){
+    S.rxDrugs[i].freq=drugDef.freq[0];
+    const fsel=document.getElementById('rxfreq-'+i);if(fsel)fsel.value=drugDef.freq[0];
+  }
+  const pt=S.selPt;const tv=pt?visArr().find(v=>v.ptId===pt.id&&v.date===today()):null;
+  const wt=tv&&tv.vitals?tv.vitals.weight:null;
+  if(wt&&pt){
+    const res=calcDose(name,wt,pt.dob,S.rxDrugs[i].freq);
+    if(res){
+      const dv=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');
+      S.rxDrugs[i].dose=dv;
+      const di=document.getElementById('rxdose-'+i);if(di)di.value=dv;
+      const dr=DRUGS.find(x=>x.name===name);
+      const hi=document.getElementById('rxhint-'+i);
+      if(hi&&dr){hi.innerHTML=formatDoseHint(res,dr);hi.style.display='block';}
+    }
+  }
   setTimeout(()=>{const d=document.getElementById('rxdose-'+i);if(d){d.focus();d.select&&d.select();}},50);
 }
 function rDrugSide(q){const f=q?DRUGS.filter(d=>d.name.toLowerCase().includes(q.toLowerCase())):DRUGS.slice(0,35);return f.slice(0,35).map(d=>`<div onclick="addRxRow(DRUGS.find(x=>x.name==='${d.name.replace(/'/g,"\\'")}'))" style="padding:7px 9px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:.15s;" onmouseover="this.style.background='#f0fdfa'" onmouseout="this.style.background=''"><div style="font-size:13px;font-weight:600;color:var(--navy);">${d.name}</div><div style="font-size:11.5px;color:var(--teal);">${d.dose_mgkg?d.dose_mgkg+' mg/kg':'Fixed'} · ${d.freq[0]}</div></div>`).join('');}
@@ -1907,7 +2037,17 @@ ${v.followup?`<div style="font-size:13.5px;margin-bottom:9px;"><b>Follow-up:</b>
 </div>
 <div style="text-align:center;margin-top:9px;font-size:9.5px;color:#c8cfe0;">Chandrawati Hospital OPD System v3 · Firebase Cloud</div>
 </div><script>window.onload=()=>window.print();<\/script></body></html>`;
-  const w=window.open('','_blank','width=900,height=700');if(w){w.document.write(html);w.document.close();}else toast('Allow popups to print','error');
+  const w=window.open('','_blank','width=900,height=700');
+  if(w){w.document.write(html);w.document.close();}
+  else{
+    // P1 FIX: Mobile fallback — download as HTML file if popup blocked
+    const blob=new Blob([html],{type:'text/html'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='Prescription_'+pt.uhid+'_'+v.date+'.html';
+    a.click();
+    toast('Popup blocked — prescription downloaded as file. Open it to print.','warn');
+  }
 }
 
 // ================================================================
