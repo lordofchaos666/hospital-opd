@@ -586,17 +586,11 @@ function saveFbConfig(c){localStorage.setItem('chwh_fbconfig',JSON.stringify(c))
 
 async function initFirebase(config){
   try{
-    // Delete any existing app before reinitializing (critical for retry/re-config)
     if(firebase.apps.length>0){
       await Promise.all(firebase.apps.map(app=>app.delete()));
     }
     firebase.initializeApp(config);
     DB=firebase.database();
-    // Sign in anonymously so Firebase Rules (auth != null) are satisfied.
-    // This does NOT give any user access to the app — the app's own
-    // login system controls that. Anonymous auth just proves the request
-    // is coming from this app, not a random script with a stolen API key.
-    await firebase.auth().signInAnonymously();
     return true;
   }catch(e){
     console.error('Firebase init error:',e);
