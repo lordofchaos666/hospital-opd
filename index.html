@@ -485,6 +485,43 @@ const INVESTIGATIONS={
 };
 
 // ================================================================
+// FIREBASE CONFIG — HARDCODED FOR GITHUB PAGES DEPLOYMENT
+// Firebase API keys are NOT secrets — they identify the project.
+// Security is enforced by Firebase Realtime Database Rules.
+// Fill these values from: Firebase Console → Project Settings →
+// Your Apps → Web App → SDK setup and configuration
+// Once filled, ALL devices (mobile/desktop) connect automatically.
+// ================================================================
+const FIREBASE_CONFIG = {
+  apiKey:        "AIzaSyBR8OGP7CpI9zOjDF41ytodGg3kWjhEH_E",   // ← paste your apiKey here
+  authDomain:    "chandrawati-opd.firebaseapp.com",   // ← e.g. your-project.firebaseapp.com
+  databaseURL:   "https://chandrawati-opd-default-rtdb.asia-southeast1.firebasedatabase.app",   // ← e.g. https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app
+  projectId:     "chandrawati-opd",   // ← e.g. your-project-id
+  appId:         "1:640465284230:web:6f6afd973a82310be4f507"    // ← e.g. 1:123456789:web:abcdef
+};
+// Set to true once you fill in all 5 values above
+const FIREBASE_HARDCODED = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.projectId);
+
+// ================================================================
+// ACCESS CONTROL HELPERS
+// ================================================================
+// Returns true if the logged-in user can see ALL patients across depts
+function canSeeAllPatients(){
+  if(!S.user) return false;
+  return S.user.role==='admin' || S.user.superAccess===true;
+}
+// Returns the patient array filtered by access rules:
+//   Admin / superAccess  → all patients
+//   Doctor               → own department only
+//   Nurse                → empty (no patient DB access)
+function getVisiblePatients(){
+  const all=ptsArr();
+  if(canSeeAllPatients()) return all;
+  if(S.user.role==='doctor') return all.filter(p=>p.dept===S.user.dept);
+  return [];
+}
+
+// ================================================================
 // APP STATE
 // ================================================================
 let S={user:null,view:'dash',selPt:null,rxDrugs:[],selInv:{},loginRole:'doctor',pts:{},visits:{}};
@@ -536,12 +573,15 @@ async function checkSetupDone(){
 // ================================================================
 async function startup(){
   showLoad('Connecting to Firebase...');
-  const cfg=loadFbConfig();
+  // Priority: hardcoded config in HTML → localStorage config → setup wizard
+  // Hardcoded config means every device auto-connects — no setup wizard needed
+  let cfg = FIREBASE_HARDCODED ? FIREBASE_CONFIG : loadFbConfig();
   if(!cfg){hideLoad();showScreen('setup');return;}
   const ok=await initFirebase(cfg);
   if(!ok){
-    hideLoad();localStorage.removeItem('chwh_fbconfig');
-    showOfflineBlock('Firebase configuration error. Config cleared — please re-enter.');
+    hideLoad();
+    if(!FIREBASE_HARDCODED) localStorage.removeItem('chwh_fbconfig');
+    showOfflineBlock('Firebase configuration error.'+(FIREBASE_HARDCODED?' Check the FIREBASE_CONFIG values in the HTML file.':' Config cleared — please re-enter.'));
     return;
   }
   showLoad('Verifying database connection...');
@@ -829,13 +869,13 @@ function buildSidebar(){
     {v:'adminlogs',i:'📊',l:'System Stats'},{v:'patients',i:'🗂',l:'Patient Records'},
     {v:'queue',i:'📋',l:'OPD Queue'}
   ]:r==='doctor'?[
-    {v:'dash',i:'🏠',l:'Dashboard'},{v:'queue',i:'📋',l:'My OPD Queue'},
-    {v:'patients',i:'👥',l:'Patients'},{v:'prescription',i:'💊',l:'Prescription'},
-    {v:'drugdb',i:'📚',l:'Drug Guidelines'}
+    {v:'dash',i:'🏠',l:'Dashboard'},{v:'queue',i:'📋',l:'OPD Queue'},
+    {v:'patients',i:'🗂',l:canSeeAllPatients()?'All Patients':'My Patients'},
+    {v:'prescription',i:'💊',l:'Prescription'},{v:'drugdb',i:'📚',l:'Drug Guidelines'}
   ]:[
+    // Nurses: NO patient records tab — queue + register + vitals only
     {v:'dash',i:'🏠',l:'Dashboard'},{v:'register',i:'➕',l:'Register Patient'},
-    {v:'patients',i:'👥',l:'Patients'},{v:'vitals',i:'🩺',l:'Record Vitals'},
-    {v:'queue',i:'📋',l:'OPD Queue'}
+    {v:'vitals',i:'🩺',l:'Record Vitals'},{v:'queue',i:'📋',l:'OPD Queue'}
   ];
   document.getElementById('snav').innerHTML='<div class="nav-sec">Navigation</div>'+
     dItems.map(it=>`<div class="nav-item ${S.view===it.v?'active':''}" onclick="nav('${it.v}');closeSidebar();"><span class="nav-icon">${it.i}</span>${it.l}</div>`).join('');
@@ -991,15 +1031,35 @@ async function doRegister(){
 // PATIENTS
 // ================================================================
 function rPatients(){
+  // Nurses have no access to patient database
+  if(S.user.role==='nurse'){
+    return `<div class="card"><div class="card-body" style="text-align:center;padding:48px 24px;">
+      <div style="font-size:40px;margin-bottom:12px;">🔒</div>
+      <div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:8px;">Access Restricted</div>
+      <div style="font-size:13.5px;color:var(--muted);max-width:340px;margin:0 auto;line-height:1.7;">
+        Patient records are not accessible to nursing staff.<br>
+        Use <b>OPD Queue</b> to record vitals for today's patients.
+      </div>
+      <button class="btn btn-teal" style="margin-top:20px;" onclick="nav('queue')">📋 Go to OPD Queue</button>
+    </div></div>`;
+  }
   const q=(document.getElementById('ptsearch')||{value:''}).value?.toLowerCase()||'';
-  const all=ptsArr();
-  const filt=all.filter(p=>!q||p.name.toLowerCase().includes(q)||p.uhid.toLowerCase().includes(q)||(p.phone&&p.phone.includes(q)));
-  return `<div class="card"><div class="card-hd"><div class="card-title">Patients (${filt.length})</div>${S.user.role==='nurse'?`<button class="btn btn-teal btn-sm" onclick="nav('register')">➕ New</button>`:''}</div><div class="card-body">
+  const visible=getVisiblePatients();
+  const filt=visible.filter(p=>!q||p.name.toLowerCase().includes(q)||p.uhid.toLowerCase().includes(q)||(p.phone&&p.phone.includes(q)));
+  const scopeLabel=canSeeAllPatients()?'All Departments':(S.user.dept||'Your Department');
+  return `<div class="card">
+  <div class="card-hd">
+    <div>
+      <div class="card-title">Patient Records (${filt.length})</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Scope: ${scopeLabel}</div>
+    </div>
+  </div>
+  <div class="card-body">
   <div class="sbar">
     <input id="ptsearch" class="fld" placeholder="🔍 Name, UHID or phone..." oninput="render('patients')" value="${q}" data-no-enter>
   </div>
   <div style="overflow-x:auto;"><table class="pt-table"><thead><tr><th>UHID</th><th>Patient</th><th>Age/Sex</th><th>Dept</th><th>Phone</th><th>Reg Date</th><th>Actions</th></tr></thead><tbody>
-  ${filt.length===0?`<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--muted);">No patients found</td></tr>`:
+  ${filt.length===0?`<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--muted);">No patients found${q?' for "'+q+'"':''}</td></tr>`:
   filt.map(p=>`<tr>
     <td><span class="uhid">${p.uhid}</span></td>
     <td><b>${p.name}</b>${p.guardian?`<div style="font-size:11px;color:var(--muted);">${p.guardian}</div>`:''}</td>
@@ -1009,7 +1069,6 @@ function rPatients(){
     <td style="font-size:12px;">${fmtD(p.regDate)}</td>
     <td style="white-space:nowrap;">
       <button class="btn btn-outline btn-xs" onclick="viewPt('${p.id}')">👁</button>
-      ${S.user.role==='nurse'?`<button class="btn btn-teal btn-xs" style="margin-left:4px;" onclick="quickVitals('${p.id}')">🩺</button>`:''}
       ${S.user.role==='doctor'?`<button class="btn btn-primary btn-xs" style="margin-left:4px;" onclick="openRx('${p.id}')">💊</button>`:''}
     </td>
   </tr>`).join('')}
@@ -1023,9 +1082,10 @@ function openRx(id){S.selPt=S.pts[id]||ptsArr().find(p=>p.id===id);S.rxDrugs=[];
 // QUEUE
 // ================================================================
 function rQueue(){
-  const isDoc=S.user.role==='doctor';
-  const tv=visArr().filter(v=>v.date===today()&&(isDoc?v.dept===S.user.dept:true));
-  return `<div class="card"><div class="card-hd"><div class="card-title">📋 ${isDoc?S.user.dept+' OPD':"Today's OPD"} — ${fmtD(today())}</div><span style="font-size:13px;color:var(--muted);">${tv.length} patients</span></div><div class="card-body">
+  // OPD queue visible to ALL roles and ALL departments
+  const tv=visArr().filter(v=>v.date===today());
+  const role=S.user.role;
+  return `<div class="card"><div class="card-hd"><div class="card-title">📋 Today's OPD Queue — ${fmtD(today())}</div><span style="font-size:13px;color:var(--muted);">${tv.length} patients</span></div><div class="card-body">
   ${tv.length===0?'<div style="text-align:center;padding:36px;color:var(--muted);">📭 No patients in queue today</div>':
   `<div style="overflow-x:auto;"><table class="pt-table"><thead><tr><th>#</th><th>UHID</th><th>Patient</th><th>Age</th><th>Dept</th><th>Vitals</th><th>Status</th><th>Action</th></tr></thead><tbody>
   ${tv.map((v,i)=>{const pt=ptsArr().find(p=>p.id===v.ptId);if(!pt)return '';const hv=v.vitals&&Object.keys(v.vitals).length>2;return `<tr>
@@ -1034,7 +1094,7 @@ function rQueue(){
     <td><b>${pt.name}</b>${pt.guardian?`<div style="font-size:11px;color:var(--muted);">${pt.guardian}</div>`:''}</td>
     <td style="font-size:12.5px;">${calcAge(pt.dob)}</td>
     <td><span class="badge ${dc(v.dept)}">${(v.dept||'').split(' ')[0]}</span></td>
-    <td>${hv?`<span style="color:var(--success);">✅</span>`:`<span style="color:var(--warn);">⚠</span>`}</td>
+    <td>${hv?`<span style="color:var(--success);">✅</span>`:`<span style="color:var(--warn);">⚠ Pending</span>`}</td>
     <td><select onchange="updSt('${v.id}',this.value)" style="padding:4px 7px;border:2px solid var(--border);border-radius:6px;font-family:var(--font);font-size:12px;outline:none;">
       <option value="waiting" ${v.status==='waiting'?'selected':''}>⏳ Waiting</option>
       <option value="inprogress" ${v.status==='inprogress'?'selected':''}>🔵 In Progress</option>
@@ -1042,8 +1102,8 @@ function rQueue(){
     </select></td>
     <td style="white-space:nowrap;">
       <button class="btn btn-outline btn-xs" onclick="viewPt('${pt.id}')">👁</button>
-      ${S.user.role==='nurse'?`<button class="btn btn-teal btn-xs" style="margin-left:4px;" onclick="quickVitals('${pt.id}')">🩺</button>`:''}
-      ${S.user.role==='doctor'||S.user.role==='admin'?`<button class="btn btn-primary btn-xs" style="margin-left:4px;" onclick="openRx('${pt.id}')">💊</button>`:''}
+      ${role==='nurse'?`<button class="btn btn-teal btn-xs" style="margin-left:4px;" onclick="quickVitals('${pt.id}')">🩺 Vitals</button>`:''}
+      ${role==='doctor'||role==='admin'?`<button class="btn btn-primary btn-xs" style="margin-left:4px;" onclick="openRx('${pt.id}')">💊 Rx</button>`:''}
     </td>
   </tr>`;}).join('')}
   </tbody></table></div>`}
@@ -1556,6 +1616,14 @@ async function renderAdminEditUser(){
           <option value="true" ${u.active!==false?'selected':''}>● Active</option>
           <option value="false" ${u.active===false?'selected':''}>○ Inactive</option>
         </select></div>
+        ${u.role==='doctor'?`<div class="field">
+          <label>Patient DB Access <span style="font-size:11px;color:var(--muted);">Doctors only</span></label>
+          <select id="eu-superaccess" class="fld">
+            <option value="false" ${!u.superAccess?'selected':''}>🔒 Own Department Only</option>
+            <option value="true" ${u.superAccess?'selected':''}>🌐 All Departments (Super Access)</option>
+          </select>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">Super Access allows this doctor to see all patients regardless of department. Assign only to senior/consultant physicians.</div>
+        </div>`:''}
       </div>
       <div style="margin-top:18px;padding-top:16px;border-top:2px solid var(--border);">
         <div style="font-size:13.5px;font-weight:700;margin-bottom:12px;color:var(--navy);">🔑 Change Password</div>
@@ -1584,6 +1652,8 @@ async function saveAdminEditUser(id){
   const dept=document.getElementById('eu-dept').value;
   const qual=document.getElementById('eu-qual').value.trim();
   const active=document.getElementById('eu-active').value==='true';
+  const superAccessEl=document.getElementById('eu-superaccess');
+  const superAccess=superAccessEl?superAccessEl.value==='true':undefined;
   const pass=document.getElementById('eu-pass').value;
   const pass2=document.getElementById('eu-pass2').value;
   const errEl=document.getElementById('eu-err');errEl.style.display='none';
@@ -1593,6 +1663,7 @@ async function saveAdminEditUser(id){
   showLoad('Saving changes...');
   try{
     const upd={name,dept,qual,active};
+    if(superAccess!==undefined) upd.superAccess=superAccess;
     if(pass){upd.passHash=await hashPass(pass);upd.passwordChangedAt=new Date().toISOString();}
     await dbUpdate('users/'+id,upd);
     hideLoad();toast('User updated successfully');nav('adminusers');
