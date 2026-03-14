@@ -1013,7 +1013,6 @@ function rDash(){
     </div></div>
   </div>`;
 }
-}
 
 // ================================================================
 // REGISTER PATIENT
@@ -1571,9 +1570,6 @@ function recalcDose(i){
   const dr=DRUGS.find(x=>x.name===d.drug);
   const hi=document.getElementById('rxhint-'+i);
   if(hi&&dr){hi.innerHTML=formatDoseHint(res,dr);hi.style.display='block';}
-}
-  document.getElementById('rxdlist').innerHTML=rRxList();
-  setTimeout(()=>{const inp=document.getElementById('rxd-'+i);if(inp){inp.focus();inp.select&&inp.select();}setupEnterNav();},50);
 }
 function remRx(i){S.rxDrugs.splice(i,1);document.getElementById('rxdlist').innerHTML=rRxList();setupEnterNav();}
 function rxDSearch(i,q){
