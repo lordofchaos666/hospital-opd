@@ -599,8 +599,9 @@ async function initFirebase(config){
 }
 
 async function checkSetupDone(){
-  return new Promise(res=>{
-    DB.ref('chwh_opd/config/initialized').once('value',snap=>res(snap.val()===true)).catch(()=>res(false));
+  return new Promise((res,rej)=>{
+    DB.ref('chwh_opd/config/initialized')
+      .once('value', snap=>res(snap.val()===true), rej);
   });
 }
 
@@ -609,35 +610,36 @@ async function checkSetupDone(){
 // ================================================================
 async function startup(){
   showLoad('Connecting to Firebase...');
-  // Priority: hardcoded config in HTML → localStorage config → setup wizard
-  // Hardcoded config means every device auto-connects — no setup wizard needed
   let cfg = FIREBASE_HARDCODED ? FIREBASE_CONFIG : loadFbConfig();
   if(!cfg){hideLoad();showScreen('setup');return;}
   const ok=await initFirebase(cfg);
   if(!ok){
     hideLoad();
     if(!FIREBASE_HARDCODED) localStorage.removeItem('chwh_fbconfig');
-    showOfflineBlock('Firebase configuration error.'+(FIREBASE_HARDCODED?' Check the FIREBASE_CONFIG values in the HTML file.':' Config cleared — please re-enter.'));
+    showOfflineBlock('Firebase configuration failed. Check your internet connection and try again.');
     return;
   }
-  showLoad('Verifying database connection...');
+  showLoad('Loading...');
   try{
-    // C1 FIX: .once('value') on .info/connected resolves immediately with false
-    // when offline. Must wait for it to become true, with hard timeout.
-    await Promise.race([
-      new Promise((res,rej)=>{
-        const ref=DB.ref('.info/connected');
-        ref.on('value',snap=>{if(snap.val()===true){ref.off('value');res();}});
-      }),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Connection timeout — Firebase unreachable after 10 seconds')),10000))
+    // Use checkSetupDone as the sole liveness probe with a 15s timeout.
+    // The old .info/connected listener was blocking startup on certain
+    // network/rule configurations — removed.
+    const done = await Promise.race([
+      checkSetupDone(),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout after 15s — check internet or Firebase rules')),15000))
     ]);
-    const done=await checkSetupDone();
     hideLoad();
     if(!done){showScreen('setup');}
     else{listenRealtime();showScreen('login');}
   }catch(e){
     hideLoad();
-    showOfflineBlock('Cannot reach Firebase database.<br><br>Possible reasons:<br>• No internet connection<br>• Firebase database URL changed<br>• Firebase project deleted or paused<br><br><b>This app does not work offline. Please restore connectivity.</b><br><br>Error: '+e.message);
+    showOfflineBlock(
+      'Cannot reach the database.<br><br>'+
+      'Most likely cause: <b>Firebase Realtime Database rules are blocking access.</b><br><br>'+
+      'Go to Firebase Console → Realtime Database → Rules and set:<br>'+
+      '<code style="background:#f1f5f9;padding:4px 8px;border-radius:5px;font-size:12px;display:block;margin:8px 0;">{ "rules": { "chwh_opd": { ".read": true, ".write": true } } }</code>'+
+      'Then click Publish.<br><br>Error: '+e.message
+    );
   }
 }
 
