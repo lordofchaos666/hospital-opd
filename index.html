@@ -565,9 +565,11 @@ let S={user:null,view:'dash',selPt:null,rxDrugs:[],selInv:{},_examFields:{},logi
 // ================================================================
 function today(){return new Date().toISOString().split('T')[0];}
 function fmtD(d){if(!d)return '-';return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}
-function ageInMonths(dob){const b=new Date(dob),n=new Date();return Math.max(0,Math.floor((n-b)/(1000*60*60*24*30.44)));}
+// DATA-3 FIX: parse YYYY-MM-DD as local date (not UTC) to avoid IST timezone shift
+function parseLocalDate(dob){if(!dob)return null;const[y,m,d]=dob.split('-').map(Number);return new Date(y,m-1,d);}
+function ageInMonths(dob){const b=parseLocalDate(dob),n=new Date();if(!b)return 0;return Math.max(0,Math.floor((n-b)/(1000*60*60*24*30.44)));}
 function ageInYears(dob){return Math.floor(ageInMonths(dob)/12);}
-function calcAge(dob){if(!dob)return '-';const b=new Date(dob),n=new Date();let yr=n.getFullYear()-b.getFullYear(),mo=n.getMonth()-b.getMonth();if(mo<0){yr--;mo+=12;}const d=n.getDate()-b.getDate();if(yr===0&&mo===0&&d<=1)return 'Newborn';if(yr>=2)return yr+' yrs';if(yr>=1)return yr+' yr '+mo+' mo';return mo+' mo '+(d<0?0:d)+' days';}
+function calcAge(dob){if(!dob)return '-';const b=parseLocalDate(dob),n=new Date();let yr=n.getFullYear()-b.getFullYear(),mo=n.getMonth()-b.getMonth();if(mo<0){yr--;mo+=12;}const d=n.getDate()-b.getDate();if(yr===0&&mo===0&&d<=1)return 'Newborn';if(yr>=2)return yr+' yrs';if(yr>=1)return yr+' yr '+mo+' mo';return mo+' mo '+(d<0?0:d)+' days';}
 function dc(dept){if(!dept)return '';const dl=dept.toLowerCase();if(dl.includes('pedia'))return 'dp';if(dl.includes('obg')||dl.includes('gyne'))return 'do';if(dl.includes('gen'))return 'dg';if(dl.includes('ortho'))return 'dr';return 'dp';}
 function uid(){return Date.now().toString(36)+'_'+Math.random().toString(36).substr(2,9);}
 function ptsArr(){return Object.values(S.pts||{});}
@@ -598,7 +600,32 @@ function _showNextToast(){
 function showLoad(msg='Loading...'){document.getElementById('loading').classList.remove('hidden');document.getElementById('loading-text').textContent=msg;}
 function hideLoad(){document.getElementById('loading').classList.add('hidden');}
 
-async function hashPass(pass){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pass));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+// SEC-1 FIX: PBKDF2 with per-user random salt — replaces unsalted SHA-256
+// Format stored: "pbkdf2:salt_hex:hash_hex"
+// Legacy SHA-256 hashes (no prefix) still accepted during login for backwards compat
+async function hashPass(pass, saltHex){
+  const salt = saltHex
+    ? new Uint8Array(saltHex.match(/.{2}/g).map(b=>parseInt(b,16)))
+    : crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:100000}, key, 256);
+  const hashHex = Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  const saltHexOut = Array.from(salt).map(b=>b.toString(16).padStart(2,'0')).join('');
+  return 'pbkdf2:'+saltHexOut+':'+hashHex;
+}
+async function verifyPass(pass, stored){
+  if(!stored) return false;
+  if(stored.startsWith('pbkdf2:')){
+    // New PBKDF2 format
+    const [,saltHex] = stored.split(':');
+    const recomputed = await hashPass(pass, saltHex);
+    return recomputed === stored;
+  }
+  // Legacy: unsalted SHA-256 — accept but will be upgraded on next password change
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
+  const hex = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  return hex === stored;
+}
 
 // ================================================================
 // FIREBASE INIT
@@ -710,10 +737,14 @@ function listenRealtime(){
   });
 }
 
+let _safeRenderTimer=null;
 function safeRender(){
-  // Only re-render non-form views to avoid disrupting user input
+  // UX-1 FIX: debounce — if both patients and visits listeners fire together,
+  // only render once after both updates settle
   const noAutoRefresh=['register','vitals','prescription','adminadduser','admineditur'];
-  if(!noAutoRefresh.includes(S.view))render(S.view);
+  if(noAutoRefresh.includes(S.view))return;
+  if(_safeRenderTimer)clearTimeout(_safeRenderTimer);
+  _safeRenderTimer=setTimeout(()=>render(S.view),80);
 }
 
 // ================================================================
@@ -751,15 +782,18 @@ async function dbGet(path){
   });
 }
 async function genUHID(){
-  // M1 FIX: use Firebase transaction to prevent duplicate UHIDs on concurrent registration
+  // DATA-4 FIX: year-scoped counter — resets to 1 each new year
+  // Stored as config/uhid_YYYY so each year has its own atomic counter
+  const yr=new Date().getFullYear();
+  const path=`chwh_opd/config/uhid_${yr}`;
   return new Promise((res,rej)=>{
     if(!DB){rej(new Error('No DB'));return;}
-    DB.ref('chwh_opd/config/lastUHID').transaction(current=>{
+    DB.ref(path).transaction(current=>{
       return (current||0)+1;
     },(err,committed,snap)=>{
       if(err||!committed){rej(err||new Error('UHID transaction failed'));return;}
       const n=snap.val();
-      res('CHWH-'+new Date().getFullYear()+'-'+String(n).padStart(5,'0'));
+      res('CHWH-'+yr+'-'+String(n).padStart(5,'0'));
     });
   });
 }
@@ -868,7 +902,7 @@ function setLoginRole(r){
 }
 
 async function doLogin(){
-  const u=document.getElementById('lu').value.trim();
+  const u=document.getElementById('lu').value.trim().toLowerCase(); // SEC-2 FIX: normalize to lowercase
   const p=document.getElementById('lp').value;
   const errEl=document.getElementById('lerr');
   errEl.style.display='none';
@@ -876,12 +910,20 @@ async function doLogin(){
   showLoad('Signing in...');
   try{
     const users=await dbGet('users')||{};
-    const ph=await hashPass(p);
-    const usr=Object.values(users).find(x=>x.username===u&&x.passHash===ph&&x.active);
+    // SEC-2 FIX: compare lowercase usernames; SEC-1 FIX: use verifyPass (PBKDF2 + legacy SHA-256)
+    const candidates=Object.values(users).filter(x=>x.username.toLowerCase()===u&&x.active);
+    let usr=null;
+    for(const c of candidates){
+      if(await verifyPass(p,c.passHash)){usr=c;break;}
+    }
     hideLoad();
     if(!usr){errEl.textContent='Invalid username or password.';errEl.style.display='block';return;}
     if(usr.role!==S.loginRole){errEl.textContent='Wrong role selected for this account.';errEl.style.display='block';return;}
-    // Update last login
+    // Upgrade legacy SHA-256 hash to PBKDF2 silently on next login
+    if(usr.passHash&&!usr.passHash.startsWith('pbkdf2:')){
+      const newHash=await hashPass(p);
+      dbUpdate('users/'+usr.id,{passHash:newHash}).catch(()=>{});
+    }
     await dbUpdate('users/'+usr.id,{lastLogin:new Date().toISOString()});
     S.user=usr;
     showScreen('app');
@@ -937,12 +979,19 @@ function buildSidebar(){
     {v:'patients',i:'🗂',l:canSeeAllPatients()?'All Patients':'My Patients'},
     {v:'prescription',i:'💊',l:'Prescription'},{v:'drugdb',i:'📚',l:'Drug Guidelines'}
   ]:[
-    // Nurses: NO patient records tab — queue + register + vitals only
     {v:'dash',i:'🏠',l:'Dashboard'},{v:'register',i:'➕',l:'Register Patient'},
     {v:'vitals',i:'🩺',l:'Record Vitals'},{v:'queue',i:'📋',l:'OPD Queue'}
   ];
-  document.getElementById('snav').innerHTML='<div class="nav-sec">Navigation</div>'+
-    dItems.map(it=>`<div class="nav-item ${S.view===it.v?'active':''}" onclick="nav('${it.v}');closeSidebar();"><span class="nav-icon">${it.i}</span>${it.l}</div>`).join('');
+  const snav=document.getElementById('snav');
+  // UX-2 FIX: only rebuild DOM if structure changes (first build or role change)
+  // On subsequent nav() calls, just update active class — no innerHTML flash
+  const existingItems=snav.querySelectorAll('.nav-item');
+  if(existingItems.length===dItems.length){
+    existingItems.forEach((el,idx)=>el.classList.toggle('active',S.view===dItems[idx].v));
+  } else {
+    snav.innerHTML='<div class="nav-sec">Navigation</div>'+
+      dItems.map(it=>`<div class="nav-item ${S.view===it.v?'active':''}" onclick="nav('${it.v}');closeSidebar();"><span class="nav-icon">${it.i}</span>${it.l}</div>`).join('');
+  }
 }
 function buildBottomNav(){
   const r=S.user.role;
@@ -956,7 +1005,13 @@ function buildBottomNav(){
     {v:'dash',i:'🏠',l:'Home'},{v:'register',i:'➕',l:'Register'},
     {v:'patients',i:'👥',l:'Patients'},{v:'vitals',i:'🩺',l:'Vitals'},{v:'queue',i:'📋',l:'Queue'}
   ];
-  document.getElementById('bnav').innerHTML=items.map(it=>`<button class="bn-item ${S.view===it.v?'active':''}" onclick="nav('${it.v}')"><span class="bn-icon">${it.i}</span><span class="bn-lbl">${it.l}</span></button>`).join('');
+  const bnav=document.getElementById('bnav');
+  const existingBtns=bnav.querySelectorAll('.bn-item');
+  if(existingBtns.length===items.length){
+    existingBtns.forEach((el,idx)=>el.classList.toggle('active',S.view===items[idx].v));
+  } else {
+    bnav.innerHTML=items.map(it=>`<button class="bn-item ${S.view===it.v?'active':''}" onclick="nav('${it.v}')"><span class="bn-icon">${it.i}</span><span class="bn-lbl">${it.l}</span></button>`).join('');
+  }
 }
 
 // NAV-1 FIX: nav() is NOT async — render() handles its own async state internally.
@@ -964,6 +1019,7 @@ function buildBottomNav(){
 // cannot await. render() sets innerHTML and calls setupEnterNav() after async ops complete.
 function nav(v,data){
   S.view=v;if(data)S.selPt=data;
+  if(v==='adminlogs')window._adminLogUsers=null; // refresh user count on each visit
   buildSidebar();buildBottomNav();
   const T={dash:'Dashboard',register:'Register Patient',patients:'Patient Records',vitals:'Record Vitals',queue:"Today's OPD",prescription:'Write Prescription',drugdb:'Drug Guidelines',ptdetail:'Patient Record',adminusers:'User Management',adminlogs:'System Statistics',adminadduser:'Add New User',admineditur:'Edit User'};
   document.getElementById('ttitle').textContent=T[v]||'OPD System';
@@ -1057,10 +1113,10 @@ function rRegister(){
   return `<div class="card"><div class="card-hd"><div class="card-title">➕ Register New Patient</div></div><div class="card-body">
   <div class="fg">
     <div class="field"><label class="req">Full Name</label><input id="rg-name" class="fld" placeholder="Patient's full name"></div>
-    <div class="field"><label class="req">Date of Birth</label><input id="rg-dob" type="date" class="fld"></div>
+    <div class="field"><label class="req">Date of Birth</label><input id="rg-dob" type="date" class="fld" max="${today()}"></div>
     <div class="field"><label class="req">Gender</label><select id="rg-sex" class="fld"><option value="">Select</option><option value="male">♂ Male</option><option value="female">♀ Female</option></select></div>
     <div class="field"><label class="req">Department</label><select id="rg-dept" class="fld"><option value="">Select</option><option>Pediatrics</option><option>OBG & Gynecology</option><option>General Medicine</option><option>Orthopedics</option></select></div>
-    <div class="field"><label>Phone Number</label><input id="rg-phone" class="fld" type="tel" placeholder="10-digit mobile"></div>
+    <div class="field"><label>Phone Number</label><input id="rg-phone" class="fld" type="tel" placeholder="10-digit mobile" pattern="[6-9][0-9]{9}" maxlength="10" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"></div>
     <div class="field"><label>Father/Guardian</label><input id="rg-guardian" class="fld" placeholder="Guardian name"></div>
     <div class="field sp3"><label>Address</label><input id="rg-addr" class="fld" placeholder="Full address"></div>
     <div class="field"><label>Known Allergies</label><input id="rg-allergy" class="fld" placeholder="Drug/food allergies"></div>
@@ -1335,7 +1391,15 @@ function intMUAC(m,mos){
   if(mos>59&&mos<=216){if(m<13.5)return{c:'zd',t:'Severely undernourished <13.5cm'};if(m<16.0)return{c:'zw',t:'Malnourished 13.5–16cm'};return{c:'zn',t:'Normal ≥16cm'};}
   return null;
 }
-function intZ(z){if(z===null||z===undefined)return{c:'',t:''};if(z<-3)return{c:'zd',t:'SAM / Severe ↓'};if(z<-2)return{c:'zw',t:'MAM / Moderate ↓'};if(z<-1)return{c:'zw',t:'Mild ↓'};if(z>2)return{c:'zn',t:'>+2SD'};return{c:'zn',t:'Normal'};}
+function intZ(z){
+  if(z===null||z===undefined)return{c:'',t:''};
+  if(z<-3)return{c:'zd',t:'SAM / Severe ↓'};
+  if(z<-2)return{c:'zw',t:'MAM / Moderate ↓'};
+  if(z<-1)return{c:'zw',t:'Mild ↓'};
+  if(z<=2)return{c:'zn',t:'Normal'};
+  if(z<=3)return{c:'zw',t:'Overweight ↑'};  // CLIN-5 FIX
+  return{c:'zd',t:'Obese >+3SD'};            // CLIN-5 FIX
+}
 
 // previewAnthro: reads values from DOM (called from button click)
 function previewAnthro(ptId){
@@ -1706,7 +1770,7 @@ function rRxList(){
           </div>
         </div>
         <div class="field"><label style="font-size:11px;">Dose</label>
-          <input id="rxdose-${i}" class="fld" value="${d.dose}" onchange="S.rxDrugs[${i}].dose=this.value" placeholder="auto-filled">
+          <input id="rxdose-${i}" class="fld" value="${d.dose}" onchange="S.rxDrugs[${i}].dose=this.value;S.rxDrugs[${i}]._manualDose=true;" placeholder="auto-filled">
         </div>
         <div class="field"><label style="font-size:11px;">Frequency</label>
           <select id="rxfreq-${i}" class="fld" onchange="S.rxDrugs[${i}].freq=this.value;recalcDose(${i})">
@@ -1739,7 +1803,17 @@ function addRxRow(drugObj){
   // D1 FIX: pass frequency to calcDose
   if(drugObj&&wt&&pt){
     const res=calcDose(drugObj.name,wt,pt.dob,nd.freq);
-    if(res){nd.dose=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');}
+    if(res){
+      let dv;
+      if(res.formType==='tab'&&(res.tabs===0||!res.tabs)){
+        // CLIN-2 FIX: 0 tabs means child too small for tablet — suggest syrup form
+        dv=res.formLabel||'Use syrup form';
+        toast('Weight too low for tablet form — consider syrup','warn');
+      } else {
+        dv=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');
+      }
+      nd.dose=dv;nd._autoCalcDose=dv;nd._manualDose=false;
+    }
   }
   document.getElementById('rxdlist').innerHTML=rRxList();
   setTimeout(()=>{const inp=document.getElementById('rxd-'+i);if(inp){inp.focus();inp.select&&inp.select();}setupEnterNav();},50);
@@ -1748,14 +1822,22 @@ function addRxRow(drugObj){
 // D2 FIX: recalculates dose when frequency changes
 function recalcDose(i){
   const d=S.rxDrugs[i];if(!d||!d.drug)return;
+  // CLIN-3 FIX: if dose was manually edited by clinician, ask before overwriting
+  const currentDoseEl=document.getElementById('rxdose-'+i);
+  const currentDose=currentDoseEl?currentDoseEl.value.trim():'';
+  if(d._manualDose&&currentDose&&currentDose!==d._autoCalcDose){
+    if(!confirm('Frequency changed — recalculate dose automatically?\n\nCurrent dose: '+currentDose+'\n\nClick OK to recalculate, Cancel to keep current dose.'))return;
+  }
   const pt=S.selPt;const tv=pt?visArr().find(v=>v.ptId===pt.id&&v.date===today()):null;
   const wt=tv&&tv.vitals?tv.vitals.weight:null;
   if(!wt||!pt)return;
   const res=calcDose(d.drug,wt,pt.dob,d.freq);
   if(!res)return;
-  const doseVal=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');
+  const doseVal=res.ml?res.ml+' ml':(res.tabs&&res.tabs>0?res.tabs+' tab':res.mgDose+' mg');
   S.rxDrugs[i].dose=doseVal;
-  const di=document.getElementById('rxdose-'+i);if(di)di.value=doseVal;
+  S.rxDrugs[i]._autoCalcDose=doseVal;
+  S.rxDrugs[i]._manualDose=false;
+  if(currentDoseEl)currentDoseEl.value=doseVal;
   const dr=DRUGS.find(x=>x.name===d.drug);
   const hi=document.getElementById('rxhint-'+i);
   if(hi&&dr){hi.innerHTML=formatDoseHint(res,dr);hi.style.display='block';}
@@ -2155,12 +2237,19 @@ function rAdminLogs(){
   const tv=vs.filter(v=>v.date===today());
   const depts={Pediatrics:0,'OBG & Gynecology':0,'General Medicine':0,'Orthopedics':0};
   vs.forEach(v=>{if(depts[v.dept]!==undefined)depts[v.dept]++;});
+  // ADMIN-1 FIX: fetch user count asynchronously for stats
+  if(!window._adminLogUsers){
+    dbGet('users').then(u=>{window._adminLogUsers=u||{};render('adminlogs');});
+  }
+  const users=window._adminLogUsers?Object.values(window._adminLogUsers):[];
+  const activeUsers=users.filter(u=>u.active!==false).length;
   return `
   <div class="stats-row">
     <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num">${pts.length}</div><div class="stat-lbl">Total Patients</div></div>
     <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-num">${vs.length}</div><div class="stat-lbl">Total Visits</div></div>
     <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-num">${tv.length}</div><div class="stat-lbl">Today's OPD</div></div>
     <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-num">${vs.filter(v=>v.rx&&v.rx.length>0).length}</div><div class="stat-lbl">Consultations</div></div>
+    <div class="stat-card"><div class="stat-icon">🔑</div><div class="stat-num">${activeUsers||'…'}</div><div class="stat-lbl">Active Accounts${users.length>0?' / '+users.length+' total':''}</div></div>
   </div>
   <div class="card"><div class="card-hd"><div class="card-title">Department Statistics</div></div><div class="card-body">
     <table class="pt-table"><thead><tr><th>Department</th><th>Total Visits</th><th>Today</th><th>Consultations Done</th></tr></thead><tbody>
