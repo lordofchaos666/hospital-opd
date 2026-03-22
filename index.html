@@ -558,7 +558,7 @@ function getVisiblePatients(){
 // ================================================================
 // APP STATE
 // ================================================================
-let S={user:null,view:'dash',selPt:null,rxDrugs:[],selInv:{},loginRole:'doctor',pts:{},visits:{}};
+let S={user:null,view:'dash',selPt:null,rxDrugs:[],selInv:{},_examFields:{},loginRole:'doctor',pts:{},visits:{}};
 
 // ================================================================
 // UTILITY
@@ -567,27 +567,31 @@ function today(){return new Date().toISOString().split('T')[0];}
 function fmtD(d){if(!d)return '-';return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}
 function ageInMonths(dob){const b=new Date(dob),n=new Date();return Math.max(0,Math.floor((n-b)/(1000*60*60*24*30.44)));}
 function ageInYears(dob){return Math.floor(ageInMonths(dob)/12);}
-function calcAge(dob){if(!dob)return '-';const b=new Date(dob),n=new Date();let yr=n.getFullYear()-b.getFullYear(),mo=n.getMonth()-b.getMonth();if(mo<0){yr--;mo+=12;}const d=n.getDate()-b.getDate();if(yr>=2)return yr+' yrs';if(yr>=1)return yr+' yr '+mo+' mo';return mo+' mo '+(d<0?0:d)+' days';}
+function calcAge(dob){if(!dob)return '-';const b=new Date(dob),n=new Date();let yr=n.getFullYear()-b.getFullYear(),mo=n.getMonth()-b.getMonth();if(mo<0){yr--;mo+=12;}const d=n.getDate()-b.getDate();if(yr===0&&mo===0&&d<=1)return 'Newborn';if(yr>=2)return yr+' yrs';if(yr>=1)return yr+' yr '+mo+' mo';return mo+' mo '+(d<0?0:d)+' days';}
 function dc(dept){if(!dept)return '';const dl=dept.toLowerCase();if(dl.includes('pedia'))return 'dp';if(dl.includes('obg')||dl.includes('gyne'))return 'do';if(dl.includes('gen'))return 'dg';if(dl.includes('ortho'))return 'dr';return 'dp';}
 function uid(){return Date.now().toString(36)+'_'+Math.random().toString(36).substr(2,9);}
 function ptsArr(){return Object.values(S.pts||{});}
 function visArr(){return Object.values(S.visits||{});}
-// UI-1 FIX: toast queue — multiple toasts stack instead of overwriting
+// UI-1 FIX: toast queue with guard against concurrent invocations from safeRender
 let _toastTimer=null;
+let _isShowingToast=false;
 const _toastQueue=[];
 function toast(msg,type='success'){
   _toastQueue.push({msg,type});
-  if(_toastQueue.length===1)_showNextToast();
+  if(!_isShowingToast)_showNextToast();
 }
 function _showNextToast(){
-  if(!_toastQueue.length)return;
+  if(!_toastQueue.length){_isShowingToast=false;return;}
+  _isShowingToast=true;
   const {msg,type}=_toastQueue[0];
   const t=document.getElementById('toast');
+  if(!t){_toastQueue.shift();_isShowingToast=false;return;}
   t.textContent=msg;t.style.display='block';
   t.style.borderLeftColor=type==='success'?'#00b8a9':type==='error'?'#ef4444':'#f59e0b';
   if(_toastTimer)clearTimeout(_toastTimer);
   _toastTimer=setTimeout(()=>{
     t.style.display='none';_toastQueue.shift();
+    _isShowingToast=false;
     if(_toastQueue.length)setTimeout(_showNextToast,200);
   },3000);
 }
@@ -689,15 +693,15 @@ function showScreen(s){
 function listenRealtime(){
   if(!DB)return;
   DB.ref('chwh_opd/patients').on('value',snap=>{
-    // SYNC-1 FIX: merge remote data into S.pts instead of full replace
-    // This prevents wiping locally-just-registered patients before Firebase listener fires
+    // SYNC-1 FIX: full replace from Firebase (authoritative source) to handle deletions correctly.
+    // Local immediate writes (S.pts[id]=pt) ensure new entries appear before listener fires.
     const remote={};snap.forEach(c=>{remote[c.key]=c.val();});
-    S.pts=Object.assign({},S.pts,remote);
+    S.pts=remote;
     if(S.view&&S.user)safeRender();
   });
   DB.ref('chwh_opd/visits').on('value',snap=>{
     const remote={};snap.forEach(c=>{remote[c.key]=c.val();});
-    S.visits=Object.assign({},S.visits,remote);
+    S.visits=remote;
     if(S.view&&S.user)safeRender();
   });
   DB.ref('.info/connected').on('value',snap=>{
@@ -755,7 +759,7 @@ async function genUHID(){
     },(err,committed,snap)=>{
       if(err||!committed){rej(err||new Error('UHID transaction failed'));return;}
       const n=snap.val();
-      res('CHWH-'+new Date().getFullYear()+'-'+String(n).padStart(4,'0'));
+      res('CHWH-'+new Date().getFullYear()+'-'+String(n).padStart(5,'0'));
     });
   });
 }
@@ -1035,8 +1039,8 @@ function rDash(){
       ${Object.entries(depts).map(([d,c])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;">${d}</span><span class="badge ${dc(d)}">${c}</span></div>`).join('')}
     </div></div>
     <div class="card"><div class="card-hd"><div class="card-title">${isDoc&&!isSuperDoc?'My Queue Today':'Recent Patients'}</div></div><div class="card-body">
-      ${(isDoc&&!isSuperDoc?myQueue:myPts.slice(-5).reverse()).length===0?'<div style="text-align:center;padding:24px;color:var(--muted);">No data yet</div>':
-      (isDoc&&!isSuperDoc?myQueue.slice(0,5):myPts.slice(-5).reverse()).map(x=>{
+      ${(isDoc&&!isSuperDoc?myQueue:[...myPts].sort((a,b)=>new Date(b.regDate||0)-new Date(a.regDate||0)).slice(0,5)).length===0?'<div style="text-align:center;padding:24px;color:var(--muted);">No data yet</div>':
+      (isDoc&&!isSuperDoc?myQueue.slice(0,5):[...myPts].sort((a,b)=>new Date(b.regDate||0)-new Date(a.regDate||0)).slice(0,5)).map(x=>{
         const pt=(isDoc&&!isSuperDoc)?ptsArr().find(p=>p.id===x.ptId):x;
         if(!pt)return '';
         return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
@@ -1173,13 +1177,14 @@ function openRx(id){S.selPt=S.pts[id]||ptsArr().find(p=>p.id===id);S.rxDrugs=[];
 // QUEUE
 // ================================================================
 function rQueue(){
-  // OPD queue visible to ALL roles and ALL departments
   const tv=visArr().filter(v=>v.date===today());
   const role=S.user.role;
+  // PERF-1 FIX: build O(1) lookup map — avoid O(n²) find() inside map()
+  const ptMap=Object.fromEntries(ptsArr().map(p=>[p.id,p]));
   return `<div class="card"><div class="card-hd"><div class="card-title">📋 Today's OPD Queue — ${fmtD(today())}</div><span style="font-size:13px;color:var(--muted);">${tv.length} patients</span></div><div class="card-body">
   ${tv.length===0?'<div style="text-align:center;padding:36px;color:var(--muted);">📭 No patients in queue today</div>':
   `<div style="overflow-x:auto;"><table class="pt-table"><thead><tr><th>#</th><th>UHID</th><th>Patient</th><th>Age</th><th>Dept</th><th>Vitals</th><th>Status</th><th>Action</th></tr></thead><tbody>
-  ${tv.map((v,i)=>{const pt=ptsArr().find(p=>p.id===v.ptId);if(!pt)return '';const hv=v.vitals&&Object.keys(v.vitals).length>2;return `<tr>
+  ${tv.map((v,i)=>{const pt=ptMap[v.ptId];if(!pt)return '';const hv=v.vitals&&Object.keys(v.vitals).length>2;return `<tr>
     <td style="color:var(--muted);font-size:12px;">${i+1}</td>
     <td><span class="uhid">${pt.uhid}</span></td>
     <td><b>${pt.name}</b>${pt.guardian?`<div style="font-size:11px;color:var(--muted);">${pt.guardian}</div>`:''}</td>
@@ -1209,12 +1214,14 @@ async function updSt(vid,st){
 // ================================================================
 function rVitals(){
   const sp=S.selPt;
-  const allPts=ptsArr();
-  // Today's queue patient IDs for prominent grouping
+  // ACCESS-1 FIX: scope visible patients by role (nurses see all for vitals, doctors see own dept)
+  const visible=S.user.role==='nurse'?ptsArr():getVisiblePatients();
   const todayPtIds=new Set(visArr().filter(v=>v.date===today()).map(v=>v.ptId));
-  const todayPts=allPts.filter(p=>todayPtIds.has(p.id));
-  const otherPts=allPts.filter(p=>!todayPtIds.has(p.id));
-  return `<div class="card"><div class="card-hd"><div class="card-title">🩺 Record Vitals</div></div><div class="card-body">
+  const todayPts=visible.filter(p=>todayPtIds.has(p.id));
+  const otherPts=visible.filter(p=>!todayPtIds.has(p.id));
+  return `<div class="card"><div class="card-hd"><div class="card-title">🩺 Record Vitals</div>
+    <button class="btn btn-outline btn-sm" onclick="render('vitals')" title="Refresh patient list">🔄</button>
+  </div><div class="card-body">
   <div class="field" style="margin-bottom:16px;max-width:480px;">
     <label>Select Patient <span style="font-size:11px;color:var(--muted);">(${todayPts.length} in today's queue)</span></label>
     <select id="vsel" class="fld" onchange="onVitSel(this.value)">
@@ -1222,7 +1229,7 @@ function rVitals(){
       ${todayPts.length>0?`<optgroup label="📋 Today's Queue (${todayPts.length})">
         ${todayPts.map(p=>`<option value="${p.id}" ${sp&&sp.id===p.id?'selected':''}>${p.uhid} — ${p.name} (${calcAge(p.dob)})</option>`).join('')}
       </optgroup>`:''}
-      ${otherPts.length>0?`<optgroup label="📁 All Other Patients">
+      ${otherPts.length>0?`<optgroup label="📁 Other Patients">
         ${otherPts.map(p=>`<option value="${p.id}" ${sp&&sp.id===p.id?'selected':''}>${p.uhid} — ${p.name} (${calcAge(p.dob)})</option>`).join('')}
       </optgroup>`:''}
     </select>
@@ -1277,14 +1284,23 @@ const BMIFA={
   204:[20.1,20.0,15.7,15.9,23.6,24.1],216:[20.4,20.2,16.0,16.1,23.9,24.3]
 };
 function getBMIZ(bmi,mos,sex){
-  if(!bmi||mos<60||mos>216)return null; // ANTHRO-1 FIX: >18yr out of reference range
+  if(!bmi||mos<60||mos>216)return null;
   const ages=Object.keys(BMIFA).map(Number).sort((a,b)=>a-b);
   let lo=ages[0],hi=ages[ages.length-1];
   for(let i=0;i<ages.length-1;i++){if(ages[i]<=mos&&ages[i+1]>mos){lo=ages[i];hi=ages[i+1];break;}}
-  const ref=BMIFA[lo];if(!ref)return null;
-  const iM=sex==='male',med=iM?ref[0]:ref[1],sd2n=iM?ref[2]:ref[3],sd1p=iM?ref[4]:ref[5];
-  const sdUp=(sd1p-med),sdDn=(med-sd2n)/2;
-  const sd=bmi>med?sdUp:sdDn;
+  const refLo=BMIFA[lo];if(!refLo)return null; // ANTHRO-1: guard missing entry
+  const iM=sex==='male';
+  if(lo===hi||mos===lo){
+    const med=iM?refLo[0]:refLo[1],sd2n=iM?refLo[2]:refLo[3],sd1p=iM?refLo[4]:refLo[5];
+    const sd=bmi>med?(sd1p-med):(med-sd2n)/2;
+    return sd>0?Math.round((bmi-med)/sd*10)/10:null;
+  }
+  const refHi=BMIFA[hi];if(!refHi)return null;
+  const t=(mos-lo)/(hi-lo);
+  const med=(iM?refLo[0]:refLo[1])+(((iM?refHi[0]:refHi[1])-(iM?refLo[0]:refLo[1]))*t);
+  const sd2n=(iM?refLo[2]:refLo[3])+(((iM?refHi[2]:refHi[3])-(iM?refLo[2]:refLo[3]))*t);
+  const sd1p=(iM?refLo[4]:refLo[5])+(((iM?refHi[4]:refHi[5])-(iM?refLo[4]:refLo[5]))*t);
+  const sd=bmi>med?(sd1p-med):(med-sd2n)/2;
   return sd>0?Math.round((bmi-med)/sd*10)/10:null;
 }
 function intBMIZ(z){
@@ -1321,22 +1337,25 @@ function intMUAC(m,mos){
 }
 function intZ(z){if(z===null||z===undefined)return{c:'',t:''};if(z<-3)return{c:'zd',t:'SAM / Severe ↓'};if(z<-2)return{c:'zw',t:'MAM / Moderate ↓'};if(z<-1)return{c:'zw',t:'Mild ↓'};if(z>2)return{c:'zn',t:'>+2SD'};return{c:'zn',t:'Normal'};}
 
+// previewAnthro: reads values from DOM (called from button click)
 function previewAnthro(ptId){
   const pt=ptsArr().find(p=>p.id===ptId);if(!pt)return;
-  const wt=parseFloat(document.getElementById('vwt').value);
-  const ht=parseFloat(document.getElementById('vht').value);
-  const muacEl=document.getElementById('vmuac');const muac=muacEl?parseFloat(muacEl.value):null;
+  const wt=parseFloat(document.getElementById('vwt')?.value)||null;
+  const ht=parseFloat(document.getElementById('vht')?.value)||null;
+  const muacEl=document.getElementById('vmuac');const muac=muacEl?parseFloat(muacEl.value)||null:null;
   const mos=ageInMonths(pt.dob);
   if(!wt&&!ht){document.getElementById('apreview').innerHTML='<div class="alert alert-warn">Enter weight and/or height first.</div>';return;}
   const bmi=wt&&ht?Math.round(wt/Math.pow(ht/100,2)*10)/10:null;
-
+  previewAnthroData(ptId,wt,ht,muac,mos,pt.sex,bmi,null);
+}
+// previewAnthroData: renders anthropometry from pre-computed values (called after save to avoid DOM race)
+function previewAnthroData(ptId,wt,ht,muac,mos,sex,bmi,savedAnthro){
   let html='';
   if(mos<60){
-    // Under 5 — WAZ, HAZ, WHZ, MUAC
-    const waz=wt?getZ(wt,mos,pt.sex,'wfa'):null;
-    const haz=ht?getZ(ht,mos,pt.sex,'hfa'):null;
-    const whzRaw=(wt&&ht)?getWHZ(wt,ht,pt.sex):null;
-    const whz=(whzRaw==='OOR')?null:whzRaw;
+    const waz=savedAnthro?savedAnthro.waz:(wt?getZ(wt,mos,sex,'wfa'):null);
+    const haz=savedAnthro?savedAnthro.haz:(ht?getZ(ht,mos,sex,'hfa'):null);
+    const whzRaw=(wt&&ht)?getWHZ(wt,ht,sex):null;
+    const whz=(whzRaw==='OOR')?null:(savedAnthro?savedAnthro.whz:whzRaw);
     const mi=intMUAC(muac,mos);
     html=`<div class="anthro-box">
       <div style="font-size:11.5px;font-weight:700;color:var(--navy);margin-bottom:10px;">📊 WHO Growth Standards — Under 5 years</div>
@@ -1349,34 +1368,41 @@ function previewAnthro(ptId){
       </div>
     </div>`;
   } else {
-    // 5+ years — HAZ up to ~19y, BMI-for-age z-score
-    const haz=ht?getZ(ht,mos,pt.sex,'hfa'):null;
-    const bmiz=bmi?getBMIZ(bmi,mos,pt.sex):null;
-    const bi=intBMIZ(bmiz);
+    const haz=savedAnthro?savedAnthro.haz:(ht&&mos<=120?getZ(ht,mos,sex,'hfa'):null);
+    const bmiz=savedAnthro?savedAnthro.bmiz:(bmi&&mos>=60&&mos<=216?getBMIZ(bmi,mos,sex):null);
+    const bi=intBMIZ(bmiz);const mi=intMUAC(muac,mos);
     html=`<div class="anthro-box">
       <div style="font-size:11.5px;font-weight:700;color:var(--navy);margin-bottom:10px;">📊 WHO Growth Standards — 5+ years</div>
       <div class="ar">
         ${wt?`<div class="ai"><div class="av zn">${wt} kg</div><div class="al">Weight</div></div>`:''}
         ${ht?`<div class="ai"><div class="av ${haz!==null?intZ(haz).c:'zn'}">${ht} cm${haz!==null?`<br><small>HAZ ${haz}</small>`:''}</div><div class="al">Height-for-Age${haz!==null?`<br><small>${intZ(haz).t}</small>`:''}</div></div>`:''}
         ${bmi?`<div class="ai"><div class="av ${bi.c}">${bmi}</div><div class="al">BMI-for-Age<br><small>${bmiz!==null?'Z: '+bmiz+'<br>':''} ${bi.t}</small></div></div>`:''}
-        ${muac?`<div class="ai"><div class="av zn">${muac} cm</div><div class="al">MUAC</div></div>`:''}
+        ${muac&&mi?`<div class="ai"><div class="av ${mi.c}">${muac}cm</div><div class="al">MUAC<br><small>${mi.t}</small></div></div>`:''}
       </div>
     </div>`;
   }
-  document.getElementById('apreview').innerHTML=html;
+  const el=document.getElementById('apreview');if(el)el.innerHTML=html;
 }
 
 async function saveVitals(ptId){
   const pt=ptsArr().find(p=>p.id===ptId);if(!pt)return;
+  // VITALS-1 FIX: read all DOM values FIRST before any async op that could re-render
   const wt=parseFloat(document.getElementById('vwt').value)||null;
   const ht=parseFloat(document.getElementById('vht').value)||null;
   const muacEl=document.getElementById('vmuac');const muac=muacEl?parseFloat(muacEl.value)||null:null;
+  const notes=document.getElementById('vnotes').value||'';
+  const temp=parseFloat(document.getElementById('vt').value)||null;
+  const hr=parseInt(document.getElementById('vhr').value)||null;
+  const rr=parseInt(document.getElementById('vrr').value)||null;
+  const spo2=parseInt(document.getElementById('vspo').value)||null;
+  const bps=parseInt(document.getElementById('vbps').value)||null;
+  const bpd=parseInt(document.getElementById('vbpd').value)||null;
   const mos=ageInMonths(pt.dob);
-  const vitals={temp:parseFloat(document.getElementById('vt').value)||null,hr:parseInt(document.getElementById('vhr').value)||null,rr:parseInt(document.getElementById('vrr').value)||null,spo2:parseInt(document.getElementById('vspo').value)||null,bps:parseInt(document.getElementById('vbps').value)||null,bpd:parseInt(document.getElementById('vbpd').value)||null,weight:wt,height:ht,muac,notes:document.getElementById('vnotes').value||'',recordedAt:new Date().toISOString(),recordedBy:S.user.name};
+  const vitals={temp,hr,rr,spo2,bps,bpd,weight:wt,height:ht,muac,notes,recordedAt:new Date().toISOString(),recordedBy:S.user.name};
   const bmi=wt&&ht?Math.round(wt/Math.pow(ht/100,2)*10)/10:null;
   const anthro={
     waz:wt&&mos<60?getZ(wt,mos,pt.sex,'wfa'):null,
-    haz:ht&&mos<=120?getZ(ht,mos,pt.sex,'hfa'):null, // ANTHRO-2: HAZ only valid <10yr per WHO CGS
+    haz:ht&&mos<=120?getZ(ht,mos,pt.sex,'hfa'):null,
     whz:(()=>{if(!(wt&&ht&&mos<60))return null;const r=getWHZ(wt,ht,pt.sex);return r==='OOR'?null:r;})(),
     bmi,
     bmiz:bmi&&mos>=60&&mos<=216?getBMIZ(bmi,mos,pt.sex):null,
@@ -1384,20 +1410,20 @@ async function saveVitals(ptId){
   };
   showLoad('Saving vitals...');
   try{
-    // V1 FIX: check both S.visits AND Firebase to avoid duplicate visits
     let tv=visArr().find(v=>v.ptId===ptId&&v.date===today());
     if(!tv){
       const vid=uid();
       tv={id:vid,ptId,date:today(),dept:pt.dept,status:'waiting',vitals:{},anthro:{},
-          complaints:'',exam:'',diag:'',rx:[],inv:[],instructions:'',followup:'',
+          complaints:'',exam:'',examFields:{},diag:'',rx:[],inv:[],instructions:'',followup:'',
           docId:'',docName:'',createdAt:new Date().toISOString()};
       await dbSet('visits/'+vid,tv);
-      S.visits[vid]=tv; // immediate local update
+      S.visits[vid]=tv;
     }
     await dbUpdate('visits/'+tv.id,{vitals,anthro});
-    S.visits[tv.id]={...tv,vitals,anthro}; // update local copy
-    hideLoad();toast('Vitals saved to cloud!');
-    previewAnthro(ptId);
+    S.visits[tv.id]={...tv,vitals,anthro};
+    hideLoad();toast('Vitals saved!');
+    // VITALS-1 FIX: pass captured values directly — don't re-read DOM which may have re-rendered
+    previewAnthroData(ptId,wt,ht,muac,mos,pt.sex,bmi,anthro);
   }catch(e){hideLoad();toast('Error: '+e.message,'error');}
 }
 
@@ -1459,7 +1485,9 @@ function toggleVisit(id){const d=document.getElementById('vx-'+id);if(d)d.style.
 // ================================================================
 // Maps frequency string → doses per day (for daily→per-dose division)
 const FREQ_DOSES_PER_DAY = {
-  'OD':1,'BD':2,'TDS':3,'QID':4,'Q4-6h':4,'Q6h':4,'Q8h':3,'Q12h':2,
+  'OD':1,'BD':2,'TDS':3,'QID':4,
+  'Q4-6h':5, // DOSE-1 FIX: midpoint of 4-6 doses/day (use 5 as conservative estimate)
+  'Q6h':4,'Q8h':3,'Q12h':2,
   'HS':1,'PRN':1,'SOS':1,'Single dose':1,'OD (PM)':1,'Alternate days':0.5
 };
 
@@ -1538,7 +1566,7 @@ function rPrescription(){
       <span style="font-size:12.5px;color:var(--muted);margin-left:8px;">${pt.uhid} · ${calcAge(pt.dob)} · ${pt.sex==='male'?'♂ M':'♀ F'}</span>
       ${pt.allergy?`<span style="background:#fee2e2;color:#ef4444;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px;">⚠ ${pt.allergy}</span>`:''}</div>
       <span class="badge ${dc(pt.dept)}">${pt.dept}</span></div>
-    ${wt?`<div style="font-size:12px;color:var(--muted);margin-top:5px;">Wt: <b>${wt}kg</b>${tv.vitals.height?' · Ht: '+tv.vitals.height+'cm':''} · Temp: ${tv.vitals.temp||'?'}°C · SpO₂: ${tv.vitals.spo2||'?'}%</div>`:'<div class="alert alert-warn" style="margin-top:7px;padding:6px 10px;font-size:12px;">⚠ No vitals today — weight needed for dose calc. Record vitals first.</div>'}
+    ${wt?`<div style="font-size:12px;color:var(--muted);margin-top:5px;">Wt: <b>${wt}kg</b>${tv.vitals.height!=null&&tv.vitals.height!==''?' · Ht: '+tv.vitals.height+'cm':''} · Temp: ${tv.vitals.temp||'?'}°C · SpO₂: ${tv.vitals.spo2||'?'}%</div>`:'<div class="alert alert-warn" style="margin-top:7px;padding:6px 10px;font-size:12px;">⚠ No vitals today — weight needed for dose calc. Record vitals first.</div>'}
     `:`<div class="field"><label>Select Patient</label>
     <select class="fld" onchange="S.selPt=getVisiblePatients().find(p=>p.id===this.value);S.rxDrugs=[];S.selInv={};S._examFields={};render('prescription');" style="max-width:400px;">
       <option value="">-- Select Patient --</option>
@@ -1791,7 +1819,7 @@ async function saveConsult(){
     }
     if(!tv){vid=uid();tv={id:vid,ptId:pt.id,date:today(),dept:pt.dept,status:'inprogress',vitals:{},anthro:{},complaints:'',exam:'',examFields:{},diag:'',rx:[],inv:[],instructions:'',followup:'',docId:'',docName:'',createdAt:new Date().toISOString()};await dbSet('visits/'+vid,tv);S.visits[vid]=tv;}
     else{vid=tv.id;}
-    const upd={complaints:document.getElementById('rx-cc')?.value||'',exam:document.getElementById('rx-ex')?.value||'',examFields:S._examFields||{},diag:document.getElementById('rx-dg')?.value||'',rx:S.rxDrugs.map(d=>({...d})),inv:Object.keys(S.selInv).filter(k=>S.selInv[k]),instructions:document.getElementById('rx-inst')?.value||'',followup:document.getElementById('rx-fu')?.value||'',docId:S.user.id,docName:S.user.name,status:'done'};
+    const upd={complaints:document.getElementById('rx-cc')?.value||'',exam:document.getElementById('rx-ex')?.value||'',examFields:S._examFields||{},diag:document.getElementById('rx-dg')?.value||'',rx:S.rxDrugs.map(d=>({...d})),inv:Object.keys(S.selInv).filter(k=>S.selInv[k]),instructions:document.getElementById('rx-inst')?.value||'',followup:document.getElementById('rx-fu')?.value||'',docId:S.user.id,docName:S.user.name,docQual:S.user.qual||'',status:'done'};
     await dbUpdate('visits/'+vid,upd);
     S.visits[vid]={...tv,...upd};
     hideLoad();toast('Consultation saved!');
@@ -1922,12 +1950,12 @@ async function toggleUserActive(id,currentActive,name){
 }
 
 async function adminDeleteUser(id,name,username){
-  if(!confirm(`⚠️ PERMANENTLY DELETE ACCOUNT?\n\nName: ${name}\nUsername: @${username}\n\nThis cannot be undone. The user will immediately lose access.`))return;
+  if(!confirm(`⚠️ PERMANENTLY DELETE ACCOUNT?\n\nName: ${name}\nUsername: @${username}\n\nThis removes login access immediately.\nNote: Past consultation and prescription records authored by this user are retained in the database (required for medical record integrity).\n\nProceed?`))return;
   if(!confirm(`Final confirmation: delete @${username}?`))return;
   showLoad('Deleting...');
   try{
     await dbRemove('users/'+id);
-    hideLoad();toast(`@${username} deleted permanently`);
+    hideLoad();toast(`@${username} account deleted`);
     render('adminusers');
   }catch(e){hideLoad();toast('Error: '+e.message,'error');}
 }
@@ -2157,15 +2185,22 @@ function rAdminLogs(){
 // ================================================================
 // PRINT PRESCRIPTION
 // ================================================================
-async function printRx(visitId, preOpenedWin){
-  const v=visArr().find(x=>x.id===visitId);if(!v)return;
-  const pt=ptsArr().find(p=>p.id===v.ptId);if(!pt)return;
-  // H3 FIX: fetch doctor from Firebase directly using stored docId
-  let doc=S.user;
-  if(v.docId){
-    try{const fetched=await dbGet('users/'+v.docId);if(fetched)doc=fetched;}
-    catch(e){/* fallback to S.user */}
-  }
+// PRINT-1 FIX: printRx is called from onclick (can't await).
+// Use cached S.pts users map if available, otherwise use S.user as fallback.
+// Doctor name is stored in v.docName at save time — use that as primary source.
+function printRx(visitId, preOpenedWin){
+  const v=visArr().find(x=>x.id===visitId);if(!v){toast('Visit not found','error');return;}
+  const pt=ptsArr().find(p=>p.id===v.ptId);if(!pt){toast('Patient not found','error');return;}
+  // Use saved docName/docId from visit record — no Firebase fetch needed
+  const doc={
+    name: v.docName||S.user.name,
+    qual: v.docQual||(S.user.id===v.docId ? S.user.qual : ''),
+    dept: v.dept||pt.dept||''
+  };
+  _renderAndPrintRx(v,pt,doc,preOpenedWin);
+}
+
+function _renderAndPrintRx(v,pt,doc,preOpenedWin){
   const vit=v.vitals||{};const ant=v.anthro||{};const mos=ageInMonths(pt.dob);
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Prescription — ${pt.name}</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
