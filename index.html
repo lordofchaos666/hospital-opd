@@ -13,7 +13,6 @@
 <!-- Firebase 9 Compat SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -564,6 +563,9 @@ let S={user:null,view:'dash',selPt:null,rxDrugs:[],selInv:{},_examFields:{},logi
 // UTILITY
 // ================================================================
 function today(){return new Date().toISOString().split('T')[0];}
+// SEC-2 FIX: escape user-entered strings before innerHTML injection to prevent XSS
+function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
 function fmtD(d){if(!d)return '-';return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}
 // DATA-3 FIX: parse YYYY-MM-DD as local date (not UTC) to avoid IST timezone shift
 function parseLocalDate(dob){if(!dob)return null;const[y,m,d]=dob.split('-').map(Number);return new Date(y,m-1,d);}
@@ -877,7 +879,7 @@ async function finishSetup(){
     const adminId='admin_'+uid();
     await dbSet('users/'+adminId,{id:adminId,username:user,name,role:'admin',dept:'Administration',qual:'Hospital Administrator',passHash:ph,active:true,createdAt:new Date().toISOString()});
     await dbSet('config/initialized',true);
-    await dbSet('config/lastUHID',0);
+    await dbSet(`config/uhid_${new Date().getFullYear()}`,0); // UHID-1 FIX: year-scoped counter
     hideLoad();toast('Setup complete! Please login.');
     listenRealtime();showScreen('login');
   }catch(e){
@@ -1100,7 +1102,7 @@ function rDash(){
         const pt=(isDoc&&!isSuperDoc)?ptsArr().find(p=>p.id===x.ptId):x;
         if(!pt)return '';
         return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
-          <div><div style="font-size:13px;font-weight:600;">${pt.name}</div><div style="font-size:11.5px;color:var(--muted);">${pt.uhid||''} · ${calcAge(pt.dob)}</div></div>
+          <div><div style="font-size:13px;font-weight:600;">${esc(pt.name)}</div><div style="font-size:11.5px;color:var(--muted);">${pt.uhid||''} · ${calcAge(pt.dob)}</div></div>
           <span class="badge ${dc(pt.dept)}">${(pt.dept||'').split(' ')[0]}</span></div>`;}).join('')}
     </div></div>
   </div>`;
@@ -1135,17 +1137,22 @@ async function doRegister(){
   const sex=document.getElementById('rg-sex').value;
   const dept=document.getElementById('rg-dept').value;
   if(!name||!dob||!sex||!dept){toast('Fill all required fields (*)','error');return;}
+  // VAL-1 FIX: JS-side DOB validation — reject future dates (HTML max= can be bypassed)
+  if(dob>today()){toast('Date of birth cannot be in the future','error');return;}
+  // VAL-2 FIX: JS-side phone validation
+  const phone=document.getElementById('rg-phone').value||'';
+  if(phone&&!/^[6-9][0-9]{9}$/.test(phone)){toast('Enter a valid 10-digit Indian mobile number','error');return;}
   showLoad('Registering patient...');
   try{
     const uhid=await genUHID();
     const ptId=uid();
     const pt={id:ptId,uhid,name,dob,sex,dept,
-      phone:document.getElementById('rg-phone').value||'',
-      guardian:document.getElementById('rg-guardian').value||'',
-      addr:document.getElementById('rg-addr').value||'',
-      allergy:document.getElementById('rg-allergy').value||'',
+      phone:phone,
+      guardian:(document.getElementById('rg-guardian').value||'').trim(),
+      addr:(document.getElementById('rg-addr').value||'').trim(),
+      allergy:(document.getElementById('rg-allergy').value||'').trim(),
       bg:document.getElementById('rg-bg').value||'',
-      ref:document.getElementById('rg-ref').value||'',
+      ref:(document.getElementById('rg-ref').value||'').trim(),
       regDate:today(),registeredBy:S.user.name};
     await dbSet('patients/'+ptId,pt);
     // IMMEDIATE LOCAL UPDATE — don't wait for Firebase listener
@@ -1213,7 +1220,7 @@ function rPatients(){
   ${filt.length===0?`<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--muted);">No patients found${q?' for "'+q+'"':''}</td></tr>`:
   filt.map(p=>`<tr>
     <td><span class="uhid">${p.uhid}</span></td>
-    <td><b>${p.name}</b>${p.guardian?`<div style="font-size:11px;color:var(--muted);">${p.guardian}</div>`:''}</td>
+    <td><b>${esc(p.name)}</b>${p.guardian?`<div style="font-size:11px;color:var(--muted);">${esc(p.guardian)}</div>`:''}</td>
     <td>${calcAge(p.dob)}/${p.sex==='male'?'M':'F'}</td>
     <td><span class="badge ${dc(p.dept)}">${(p.dept||'').split(' ')[0]}</span></td>
     <td style="font-size:12.5px;">${p.phone||'-'}</td>
@@ -1226,7 +1233,7 @@ function rPatients(){
   </tbody></table></div></div></div>`;
 }
 function viewPt(id){S.selPt=S.pts[id]||ptsArr().find(p=>p.id===id);nav('ptdetail');}
-function quickVitals(id){S.selPt=S.pts[id]||ptsArr().find(p=>p.id===id);nav('vitals');}
+function quickVitals(id){S.selPt=S.pts[id]||ptsArr().find(p=>p.id===id);S._examFields={};nav('vitals');}
 function openRx(id){S.selPt=S.pts[id]||ptsArr().find(p=>p.id===id);S.rxDrugs=[];S.selInv={};S._examFields={};nav('prescription');}
 
 // ================================================================
@@ -1243,7 +1250,7 @@ function rQueue(){
   ${tv.map((v,i)=>{const pt=ptMap[v.ptId];if(!pt)return '';const hv=v.vitals&&Object.keys(v.vitals).length>2;return `<tr>
     <td style="color:var(--muted);font-size:12px;">${i+1}</td>
     <td><span class="uhid">${pt.uhid}</span></td>
-    <td><b>${pt.name}</b>${pt.guardian?`<div style="font-size:11px;color:var(--muted);">${pt.guardian}</div>`:''}</td>
+    <td><b>${esc(pt.name)}</b>${pt.guardian?`<div style="font-size:11px;color:var(--muted);">${pt.guardian}</div>`:''}</td>
     <td style="font-size:12.5px;">${calcAge(pt.dob)}</td>
     <td><span class="badge ${dc(v.dept)}">${(v.dept||'').split(' ')[0]}</span></td>
     <td>${hv?`<span style="color:var(--success);">✅</span>`:`<span style="color:var(--warn);">⚠ Pending</span>`}</td>
@@ -1303,7 +1310,7 @@ function rVitForm(pt){
   const mos=ageInMonths(pt.dob),is5=mos<60;
   const tv=visArr().find(v=>v.ptId===pt.id&&v.date===today());
   const ev=tv&&tv.vitals?tv.vitals:{};
-  return `<div class="alert alert-info">Patient: <b>${pt.name}</b> · ${pt.uhid} · ${calcAge(pt.dob)} · ${pt.sex==='male'?'♂ Male':'♀ Female'}${pt.allergy?`<br><span style="color:#ef4444;font-weight:600;">⚠ Allergy: ${pt.allergy}</span>`:''}</div>
+  return `<div class="alert alert-info">Patient: <b>${esc(pt.name)}</b> · ${pt.uhid} · ${calcAge(pt.dob)} · ${pt.sex==='male'?'♂ Male':'♀ Female'}${pt.allergy?`<br><span style="color:#ef4444;font-weight:600;">⚠ Allergy: ${pt.allergy}</span>`:''}</div>
   <div class="vg">
     <div class="field"><label>Temp (°C)</label><input id="vt" class="fld" type="number" step="0.1" placeholder="37.0" value="${ev.temp||''}"></div>
     <div class="field"><label>HR (bpm)</label><input id="vhr" class="fld" type="number" placeholder="80" value="${ev.hr||''}"></div>
@@ -1369,6 +1376,7 @@ function intBMIZ(z){
   return{c:'zw',t:'Obese'};
 }
 function getZ(val,mos,sex,type){
+  if(!val||!mos||!sex)return null; // ANTHRO-1 FIX: guard undefined sex/val/mos
   const T=type==='wfa'?(sex==='male'?WFA_B:WFA_G):(sex==='male'?HFA_B:HFA_G);
   const ages=Object.keys(T).map(Number).sort((a,b)=>a-b);
   // A4 FIX: interpolate between adjacent age buckets for more accuracy
@@ -1501,7 +1509,7 @@ function rPtDetail(){
   const mos=ageInMonths(pt.dob);
   return `
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-    <div><h2 style="font-size:19px;font-weight:800;">${pt.name}</h2>
+    <div><h2 style="font-size:19px;font-weight:800;">${esc(pt.name)}</h2>
     <div style="font-size:13px;color:var(--muted);margin-top:3px;">${pt.uhid} · ${calcAge(pt.dob)} · ${pt.sex==='male'?'♂ M':'♀ F'} · <span class="badge ${dc(pt.dept)}">${pt.dept}</span></div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       ${S.user.role==='nurse'?`<button class="btn btn-teal btn-sm" onclick="quickVitals('${pt.id}')">🩺 Vitals</button>`:''}
@@ -1568,7 +1576,7 @@ function calcDose(drug, weight, dob, freq){
   const mgPerDose   = Math.round((totalDayMg / dosesPerDay) * 10) / 10;
 
   const result = {
-    mgDose:mgPerDose, totalDayMg, dosesPerDay, freq,
+    mgPerDose, totalDayMg, dosesPerDay, freq,
     ageYrs, mos, drug:d
   };
 
@@ -1595,7 +1603,7 @@ function parseTabStrength(s){if(!s)return null;const m=s.match(/(\d+)\s*mg/i);if
 function formatDoseHint(res, drug){
   // D3 FIX: clearly label daily vs per-dose
   const freqLabel = res.freq||'';
-  let h=`<b>${res.mgPerDose||res.mgDose} mg/dose</b>`;
+  let h=`<b>${res.mgPerDose} mg/dose</b>`;
   if(res.dosesPerDay>1){
     h+=` × ${res.dosesPerDay} = <span style="color:#6b7280;">${res.totalDayMg} mg/day</span>`;
   }
@@ -1620,15 +1628,23 @@ function rPrescription(){
   const tv=pt?visArr().find(v=>v.ptId===pt.id&&v.date===today()):null;
   const wt=tv&&tv.vitals?tv.vitals.weight:null;
   const mos=pt?ageInMonths(pt.dob):0;
+  // RX-1 FIX: restore saved drugs and investigations from today's visit
+  // Only restore if S.rxDrugs is empty (fresh open) and saved data exists
+  if(tv&&tv.rx&&tv.rx.length>0&&S.rxDrugs.length===0){
+    S.rxDrugs=tv.rx.map(d=>({...d}));
+  }
+  if(tv&&tv.inv&&tv.inv.length>0&&Object.keys(S.selInv).length===0){
+    tv.inv.forEach(k=>{S.selInv[k]=true;});
+  }
   return `<div style="display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start;">
   <div>
   <div class="card" style="margin-bottom:12px;">
     <div class="card-hd"><div class="card-title">👤 Patient</div></div>
     <div class="card-body" style="padding:12px 16px;">
     ${pt?`<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-      <div><span style="font-size:17px;font-weight:800;">${pt.name}</span>
+      <div><span style="font-size:17px;font-weight:800;">${esc(pt.name)}</span>
       <span style="font-size:12.5px;color:var(--muted);margin-left:8px;">${pt.uhid} · ${calcAge(pt.dob)} · ${pt.sex==='male'?'♂ M':'♀ F'}</span>
-      ${pt.allergy?`<span style="background:#fee2e2;color:#ef4444;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px;">⚠ ${pt.allergy}</span>`:''}</div>
+      ${pt.allergy?`<span style="background:#fee2e2;color:#ef4444;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:6px;">⚠ ${esc(pt.allergy)}</span>`:''}</div>
       <span class="badge ${dc(pt.dept)}">${pt.dept}</span></div>
     ${wt?`<div style="font-size:12px;color:var(--muted);margin-top:5px;">Wt: <b>${wt}kg</b>${tv.vitals.height!=null&&tv.vitals.height!==''?' · Ht: '+tv.vitals.height+'cm':''} · Temp: ${tv.vitals.temp||'?'}°C · SpO₂: ${tv.vitals.spo2||'?'}%</div>`:'<div class="alert alert-warn" style="margin-top:7px;padding:6px 10px;font-size:12px;">⚠ No vitals today — weight needed for dose calc. Record vitals first.</div>'}
     `:`<div class="field"><label>Select Patient</label>
@@ -1758,7 +1774,7 @@ function rRxList(){
   const pt=S.selPt;const tv=pt?visArr().find(v=>v.ptId===pt.id&&v.date===today()):null;const wt=tv&&tv.vitals?tv.vitals.weight:null;
   return S.rxDrugs.map((d,i)=>{
     const dr=DRUGS.find(x=>x.name===d.drug);
-    const res=(dr&&wt&&pt)?calcDose(d.drug,wt,pt.dob):null;
+    const res=(dr&&wt&&pt)?calcDose(d.drug,wt,pt.dob,d.freq):null;
     const hint=res?formatDoseHint(res,dr):'';
     return `<div class="rx-drug-row" id="rxrow-${i}">
       <button class="rx-remove" onclick="remRx(${i})">×</button>
@@ -1810,7 +1826,7 @@ function addRxRow(drugObj){
         dv=res.formLabel||'Use syrup form';
         toast('Weight too low for tablet form — consider syrup','warn');
       } else {
-        dv=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');
+        dv=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgPerDose+' mg');
       }
       nd.dose=dv;nd._autoCalcDose=dv;nd._manualDose=false;
     }
@@ -1833,7 +1849,7 @@ function recalcDose(i){
   if(!wt||!pt)return;
   const res=calcDose(d.drug,wt,pt.dob,d.freq);
   if(!res)return;
-  const doseVal=res.ml?res.ml+' ml':(res.tabs&&res.tabs>0?res.tabs+' tab':res.mgDose+' mg');
+  const doseVal=res.ml?res.ml+' ml':(res.tabs&&res.tabs>0?res.tabs+' tab':res.mgPerDose+' mg');
   S.rxDrugs[i].dose=doseVal;
   S.rxDrugs[i]._autoCalcDose=doseVal;
   S.rxDrugs[i]._manualDose=false;
@@ -1867,7 +1883,7 @@ function selectDrug(i,name){
   if(wt&&pt){
     const res=calcDose(name,wt,pt.dob,S.rxDrugs[i].freq);
     if(res){
-      const dv=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgDose+' mg');
+      const dv=res.ml?res.ml+' ml':(res.tabs?res.tabs+' tab':res.mgPerDose+' mg');
       S.rxDrugs[i].dose=dv;
       const di=document.getElementById('rxdose-'+i);if(di)di.value=dv;
       const dr=DRUGS.find(x=>x.name===name);
@@ -1984,13 +2000,13 @@ async function renderAdminUsers(){
           <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:200px;">
             <div style="width:42px;height:42px;border-radius:50%;background:${roleColor[u.role]||'#374151'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff;flex-shrink:0;">${av}</div>
             <div>
-              <div style="font-size:14px;font-weight:800;color:var(--navy);">${u.name}${isYou?` <span style="font-size:10px;background:#eef2fb;color:var(--muted);padding:1px 6px;border-radius:10px;font-weight:600;">YOU</span>`:''}</div>
+              <div style="font-size:14px;font-weight:800;color:var(--navy);">${esc(u.name)}${isYou?` <span style="font-size:10px;background:#eef2fb;color:var(--muted);padding:1px 6px;border-radius:10px;font-weight:600;">YOU</span>`:''}</div>
               <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
                 <span style="font-size:12px;font-family:'DM Mono',monospace;background:#f1f5f9;color:#374151;padding:1px 7px;border-radius:5px;font-weight:600;">@${u.username}</span>
                 <span style="font-size:11.5px;background:${roleBg[u.role]||'#f3f4f6'};color:${roleText[u.role]||'#374151'};padding:2px 8px;border-radius:20px;font-weight:700;">${u.role.toUpperCase()}</span>
                 <span style="font-size:11px;padding:2px 7px;border-radius:20px;font-weight:600;background:${isActive?'#d1fae5':'#fee2e2'};color:${isActive?'#065f46':'#991b1b'};">${isActive?'● Active':'○ Inactive'}</span>
               </div>
-              <div style="font-size:11.5px;color:var(--muted);margin-top:3px;">${u.dept||''}${u.qual?' · '+u.qual:''}</div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:3px;">${esc(u.dept)||''}${u.qual?' · '+u.qual:''}</div>
               <div style="font-size:11px;color:#94a3b8;margin-top:1px;">${u.lastLogin?'Last login: '+fmtD(u.lastLogin.split('T')[0]):'Never logged in'} · Created: ${fmtD((u.createdAt||'').split('T')[0])}</div>
             </div>
           </div>
@@ -2166,8 +2182,9 @@ function rAdminAddUser(){
       </div>
       <div class="field"><label>Qualification</label>
         <input id="nu-qual" class="fld" placeholder="MD, MS, GNM, MBBS..."></div>
-      <div class="field"><label>System ID <span style="font-size:11px;color:var(--muted);">(auto-generated)</span></label>
-        <input class="fld" value="usr_xxxxxxxx" id="nu-id-preview" style="background:#f8f9fd;font-family:monospace;font-size:12px;color:#6b7a9d;" readonly></div>
+      <div class="field"><label>System ID</label>
+        <div style="font-size:12px;color:var(--muted);padding:9px 12px;background:#f8f9fd;border-radius:8px;border:1.5px solid var(--border);font-family:monospace;">Auto-generated on account creation</div>
+      </div>
       <div class="field"><label class="req">Password</label>
         <input id="nu-pass" type="password" class="fld" placeholder="Minimum 8 characters"></div>
       <div class="field"><label class="req">Confirm Password</label>
@@ -2291,7 +2308,7 @@ function printRx(visitId, preOpenedWin){
 
 function _renderAndPrintRx(v,pt,doc,preOpenedWin){
   const vit=v.vitals||{};const ant=v.anthro||{};const mos=ageInMonths(pt.dob);
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Prescription — ${pt.name}</title>
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Prescription — ${esc(pt.name)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Outfit',sans-serif;background:#fff;}
 .sheet{max-width:210mm;margin:0 auto;padding:16mm 14mm 12mm;min-height:297mm;}
@@ -2323,7 +2340,7 @@ function _renderAndPrintRx(v,pt,doc,preOpenedWin){
 <div class="phs">GT Road, Barwadda, Dhanbad · Jharkhand 826001</div>
 <div class="phs">Pediatrics · OBG & Gynecology · General Medicine · Orthopedics</div></div></div></div>
 <div class="pc">Date: ${fmtD(v.date)}<br>UHID: ${pt.uhid}</div></div>
-<div class="ppts"><div class="ppt-i">Patient<span>${pt.name}</span></div><div class="ppt-i">Age/Sex<span>${calcAge(pt.dob)}/${pt.sex==='male'?'M':'F'}</span></div><div class="ppt-i">Guardian<span>${pt.guardian||'-'}</span></div><div class="ppt-i">Phone<span>${pt.phone||'-'}</span></div></div>
+<div class="ppts"><div class="ppt-i">Patient<span>${esc(pt.name)}</span></div><div class="ppt-i">Age/Sex<span>${calcAge(pt.dob)}/${pt.sex==='male'?'M':'F'}</span></div><div class="ppt-i">Guardian<span>${esc(pt.guardian)||"-"}</span></div><div class="ppt-i">Phone<span>${pt.phone||'-'}</span></div>${pt.addr?`<div class="ppt-i" style="grid-column:span 2;"><span style="color:#6b7a9d;font-size:10px;text-transform:uppercase;">Address</span><span style="font-size:12px;">${pt.addr}</span></div>`:''} ${pt.allergy?`<div class="ppt-i" style="grid-column:span 2;background:#fee2e2;border-radius:6px;padding:5px 9px;"><span style="color:#991b1b;font-weight:800;">⚠ ALLERGY: </span><span style="color:#7f1d1d;font-weight:700;">${esc(pt.allergy)}</span></div>`:''}</div>
 ${(vit.temp||vit.hr||vit.weight)?`<div class="pvits">${vit.temp?`<div class="pvit">Temp<span>${vit.temp}°C</span></div>`:''} ${vit.hr?`<div class="pvit">HR<span>${vit.hr}/min</span></div>`:''} ${vit.rr?`<div class="pvit">RR<span>${vit.rr}/min</span></div>`:''} ${vit.spo2?`<div class="pvit">SpO₂<span>${vit.spo2}%</span></div>`:''} ${vit.weight?`<div class="pvit">Weight<span>${vit.weight}kg</span></div>`:''} ${vit.height?`<div class="pvit">Height<span>${vit.height}cm</span></div>`:''}</div>`:''}
 ${(ant.waz!==null&&ant.waz!==undefined||ant.haz!==null&&ant.haz!==undefined)?`<div class="pantro">
   ${mos<60?
@@ -2335,17 +2352,17 @@ ${(ant.waz!==null&&ant.waz!==undefined||ant.haz!==null&&ant.haz!==undefined)?`<d
   }
   ${ant.muac?` · MUAC: <span>${ant.muac}cm</span>`:''}
 </div>`:''}
-${v.complaints?`<div class="pdb"><div class="pdbt">Chief Complaints</div>${v.complaints}</div>`:''}
+${v.complaints?`<div class="pdb"><div class="pdbt">Chief Complaints</div>${esc(v.complaints)}</div>`:''}
 ${v.exam?`<div class="pdb"><div class="pdbt">Examination Findings</div><div style="font-size:12.5px;line-height:1.8;white-space:pre-line;">${v.exam}</div></div>`:''}
-${v.diag?`<div class="pdb"><div class="pdbt">Diagnosis</div><b>${v.diag}</b></div>`:''}
+${v.diag?`<div class="pdb"><div class="pdbt">Diagnosis</div><b>${esc(v.diag)}</b></div>`:''}
 ${v.rx&&v.rx.length>0?`<div class="prx">Rx</div><table class="prxt"><thead><tr><th>#</th><th>Drug / Medicine</th><th>Dose</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead><tbody>
-${v.rx.map((r,i)=>`<tr><td style="color:#6b7a9d;font-size:11.5px;">${i+1}</td><td style="font-weight:700;font-size:14px;">${r.drug}</td><td>${r.dose||'-'}</td><td>${r.freq||'-'}</td><td>${r.dur||'-'}</td><td style="color:#6b7a9d;font-size:12px;">${r.instr||'-'}</td></tr>`).join('')}
+${v.rx.map((r,i)=>`<tr><td style="color:#6b7a9d;font-size:11.5px;">${i+1}</td><td style="font-weight:700;font-size:14px;">${esc(r.drug)}</td><td>${esc(r.dose)||'-'}</td><td>${esc(r.freq)||'-'}</td><td>${esc(r.dur)||'-'}</td><td style="color:#6b7a9d;font-size:12px;">${r.instr||'-'}</td></tr>`).join('')}
 </tbody></table>`:''}
 ${v.inv&&v.inv.length>0?`<div style="font-size:19px;font-weight:700;color:#9d174d;margin-bottom:8px;">🔬 Investigations Ordered</div>
 <table class="pinvt"><thead><tr><th>#</th><th>Investigation</th><th>Remarks</th></tr></thead><tbody>
 ${v.inv.map((inv,i)=>`<tr><td style="color:#9d174d;font-size:11.5px;">${i+1}</td><td>${inv}</td><td></td></tr>`).join('')}
 </tbody></table>`:''}
-${v.instructions?`<div class="pdb"><div class="pdbt">Instructions / Advice</div>${v.instructions}</div>`:''}
+${v.instructions?`<div class="pdb"><div class="pdbt">Instructions / Advice</div>${esc(v.instructions)}</div>`:''}
 ${v.followup?`<div style="font-size:13.5px;margin-bottom:9px;"><b>Follow-up:</b> ${fmtD(v.followup)}</div>`:''}
 <div class="pft">
   <div style="font-size:12px;color:#6b7a9d;">⚠ Prescription valid 7 days · Bring this prescription on next visit</div>
